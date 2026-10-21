@@ -423,3 +423,16 @@ button.mvp-taskjump:hover{background:var(--bg)}
 
 /* Security draft: hide all patient data while app is being background-locked. */
 body.msw-private { visibility: hidden !important; }
+
+/* BEDCOLOR1: ward and ICU share occupancy colors. Only patient map cards;
+   clinical data, print styles, filters and patient assignment are untouched. */
+#patientList .general-room-map .occupied-bed,
+#patientList .icu-map .occupied-bed {
+  background-color: #cfe4ff;
+}
+#patientList .general-room-map .empty-bed,
+#patientList .icu-map .empty-bed {
+  background-color: #ffffff;
+  border-style: dashed;
+  opacity: 1;
+}
