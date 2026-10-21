@@ -1,454 +1,21 @@
-<!doctype html><html lang="ja"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#0f766e">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-6gQP2YbyVZAFBdx22/Ae8+m+iHgArdXd9+KY+oLBj30='; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'">
-<title>MSW MVP01 RC3M 架空患者のみ・単体実機プレビュー</title>
-<style>:root{--bg:#f4f7f7;--card:#fff;--ink:#173033;--muted:#687b7d;--line:#d9e4e4;--brand:#0f766e;--brand2:#14b8a6;--warn:#c2410c;--danger:#b91c1c;--shadow:0 6px 24px rgba(15,60,60,.08)}
-*{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}body{min-height:100vh}
-button,input,select,textarea{font:inherit}button{touch-action:manipulation}.hidden{display:none!important}
-.shell{min-height:100vh;padding-bottom:84px}.topbar{position:sticky;top:0;z-index:30;background:rgba(255,255,255,.94);backdrop-filter:blur(14px);border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 16px 10px;display:flex;align-items:center;gap:12px}.brand{font-weight:800;font-size:20px;letter-spacing:.02em}.spacer{flex:1}.pill{border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px;color:var(--ink)}
-.content{padding:16px;max-width:1200px;margin:auto}.hero{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:14px}.hero h1{font-size:24px;margin:0}.hero p{margin:4px 0 0;color:var(--muted)}
-.kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:12px 0 18px}.kpi{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:13px;box-shadow:var(--shadow)}.kpi b{font-size:24px;display:block}.kpi span{font-size:12px;color:var(--muted)}
-.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin:10px 0 14px}.toolbar input,.toolbar select{border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px 12px;min-height:44px}.toolbar input{flex:1;min-width:180px}.btn{border:0;border-radius:12px;padding:11px 14px;background:var(--brand);color:#fff;font-weight:700}.btn.secondary{background:#fff;color:var(--ink);border:1px solid var(--line)}.btn.warn{background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}.btn.danger{background:#fff1f2;color:var(--danger);border:1px solid #fecdd3}.btn:disabled{opacity:.45}
-.section{margin:18px 0}.section-title{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;margin:0 0 8px}.count{font-size:12px;background:#dff5f1;color:#0f766e;padding:3px 8px;border-radius:999px}
-.patient-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.patient-card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px;box-shadow:var(--shadow);cursor:pointer;min-height:104px}.patient-card:active{transform:scale(.99)}.pc-head{display:flex;align-items:center;gap:8px}.bed{font-size:13px;font-weight:800;color:#0f766e;background:#e6fffb;border-radius:8px;padding:4px 7px}.name{font-size:17px;font-weight:800}.pc-meta{font-size:12px;color:var(--muted);margin-top:8px;display:flex;gap:10px;flex-wrap:wrap}.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:9px}.tag{font-size:11px;border-radius:999px;padding:4px 8px;background:#eef2f2;color:#425556}.tag.orange{background:#fff7ed;color:#9a3412}.tag.red{background:#fff1f2;color:#b91c1c}.tag.green{background:#ecfdf5;color:#047857}.tag.purple{background:#f5f3ff;color:#6d28d9}
-.bottomnav{position:fixed;left:0;right:0;bottom:0;z-index:40;background:rgba(255,255,255,.96);border-top:1px solid var(--line);display:grid;grid-template-columns:repeat(5,1fr);padding:6px 8px calc(6px + env(safe-area-inset-bottom));backdrop-filter:blur(14px)}.navbtn{border:0;background:transparent;padding:9px 4px;color:var(--muted);font-size:12px;font-weight:700}.navbtn.active{color:var(--brand)}.navbtn .ico{display:block;font-size:22px;margin-bottom:2px}
-.panel{background:#fff;border:1px solid var(--line);border-radius:16px;padding:14px;box-shadow:var(--shadow);margin-bottom:12px}.panel h2,.panel h3{margin:0 0 12px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.field label{font-size:12px;color:var(--muted);display:block;margin:0 0 4px}.field input,.field select,.field textarea{width:100%;border:1px solid var(--line);border-radius:10px;padding:10px;background:#fff;min-height:42px}.field textarea{min-height:82px;resize:vertical}.span2{grid-column:span 2}
-.modal{position:fixed;inset:0;z-index:80;background:rgba(7,28,29,.42);display:flex;align-items:stretch;justify-content:center}.sheet{background:var(--bg);width:min(100%,1100px);height:100%;overflow:auto}.sheethead{position:sticky;top:0;z-index:5;background:#fff;border-bottom:1px solid var(--line);padding:calc(10px + env(safe-area-inset-top)) 14px 10px;display:flex;gap:10px;align-items:center}.sheethead h2{margin:0;font-size:20px}.tabs{position:sticky;top:65px;z-index:4;background:var(--bg);display:flex;gap:6px;overflow:auto;padding:8px 14px;border-bottom:1px solid var(--line)}.tab{white-space:nowrap;border:1px solid var(--line);background:#fff;border-radius:999px;padding:8px 12px}.tab.active{background:var(--brand);color:#fff;border-color:var(--brand)}.sheetbody{padding:14px;max-width:1000px;margin:auto}
-.timeline{display:flex;flex-direction:column;gap:8px}.note{border-left:4px solid var(--brand2);background:#fff;border-radius:10px;padding:10px 12px}.note .time{font-size:11px;color:var(--muted)}.note .type{font-weight:800;margin:3px 0}.empty{padding:28px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:14px}
-.drug-list{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}.drug{background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px}.drug b{font-size:17px}.drug .small{font-size:12px;color:var(--muted);margin-top:4px}.drug .effect{font-size:13px;white-space:pre-wrap;margin-top:8px}
-.lockwrap{min-height:100vh;display:grid;place-items:center;padding:24px;background:linear-gradient(145deg,#dff7f3,#f7fbfb)}.lockcard{width:min(100%,430px);background:#fff;border:1px solid var(--line);border-radius:24px;padding:24px;box-shadow:0 20px 60px rgba(10,60,60,.15)}.lockcard h1{margin:0 0 5px}.lockcard p{color:var(--muted)}.lockcard input{width:100%;font-size:22px;letter-spacing:.12em;text-align:center;padding:14px;border:1px solid var(--line);border-radius:14px;margin:10px 0}.notice{font-size:12px;color:var(--muted);line-height:1.6}.alert{padding:10px 12px;border-radius:10px;margin:10px 0;background:#fff7ed;color:#9a3412;border:1px solid #fed7aa}.success{background:#ecfdf5;color:#047857;border-color:#a7f3d0}
-.settings-row{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.settings-row:last-child{border-bottom:0}.settings-row small{display:block;color:var(--muted);margin-top:3px}.storagebar{height:10px;background:#e7eeee;border-radius:999px;overflow:hidden;margin-top:8px}.storagebar>div{height:100%;background:var(--brand2)}
-@media(max-width:800px){.patient-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.kpis{grid-template-columns:repeat(2,1fr)}.drug-list{grid-template-columns:1fr}}
-@media(max-width:520px){.patient-grid{grid-template-columns:1fr}.form-grid{grid-template-columns:1fr}.span2{grid-column:span 1}.topbar{padding-left:10px;padding-right:10px}.content{padding:10px}.hero h1{font-size:21px}}
-@media print{.topbar,.bottomnav,.toolbar,.no-print,.tabs{display:none!important}.shell{padding:0}.content{max-width:none;padding:0}.patient-grid{display:table;width:100%;border-collapse:collapse}.patient-card{display:table-row;box-shadow:none;border:0}.patient-card>*{display:table-cell;border-bottom:1px solid #aaa;padding:6px}.tags{display:none}.section{page-break-inside:avoid}.kpis,.hero p{display:none}.hero{margin:0}.hero h1{font-size:18px}}
-
-.field select[data-master-field]{background:#fff;cursor:pointer}.field select[data-master-field]:focus{outline:2px solid rgba(20,184,166,.18);border-color:var(--brand2)}
-.backupwarn{background:#fff7ed;color:#9a3412;border-color:#fed7aa;font-weight:800}
-@media(max-width:620px){.topbar .pill:nth-of-type(2){display:none}.backupwarn{display:inline-block!important}}
-
-
-/* ===== 病床マップ Ver.1.0.1 ===== */
-
-.map-section{
-  margin:18px 0 28px;
-}
-
-.map-section-title{
-  display:flex;
-  align-items:center;
-  gap:12px;
-  margin-bottom:12px;
-}
-
-.map-section-title > div{
-  display:flex;
-  align-items:baseline;
-  gap:10px;
-}
-
-.map-section-title strong{
-  font-size:20px;
-}
-
-.map-section-title span{
-  color:var(--muted);
-  font-size:13px;
-}
-
-.map-section-title .count{
-  margin-left:auto;
-}
-
-.room-map{
-  display:grid;
-  grid-template-columns:repeat(2,minmax(0,1fr));
-  gap:14px;
-}
-
-.room-block{
-  background:var(--card);
-  border:1px solid var(--line);
-  border-radius:16px;
-  padding:12px;
-}
-
-.room-title{
-  font-size:18px;
-  font-weight:800;
-  margin-bottom:10px;
-}
-
-.bed-grid{
-  display:grid;
-  grid-template-columns:repeat(3,minmax(0,1fr));
-  gap:8px;
-}
-
-.bed-slot{
-  appearance:none;
-  width:100%;
-  min-height:130px;
-  padding:10px;
-  border:1px solid var(--line);
-  border-radius:12px;
-  background:var(--card);
-  color:inherit;
-  font:inherit;
-  text-align:left;
-  cursor:pointer;
-  display:flex;
-  flex-direction:column;
-  gap:6px;
-}
-
-.bed-slot:hover{
-border-color:var(--brand);
-}
-
-.bed-slot b{
-  font-size:14px;
-}
-
-.bed-slot strong{
-  font-size:16px;
-}
-
-.bed-slot > span{
-  font-size:13px;
-}
-
-.bed-slot small{
-  color:var(--muted);
-}
-
-.bed-line{
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:6px;
-}
-
-.empty-bed{
-  border-style:dashed;
-  justify-content:center;
-  align-items:center;
-  text-align:center;
-  opacity:.75;
-}
-
-.empty-bed span{
-  font-size:16px;
-  font-weight:700;
-}
-
-.occupied-bed{
-  box-shadow:0 2px 8px rgba(0,0,0,.04);
-}
-
-@media(max-width:800px){
-  .room-map{
-    grid-template-columns:1fr;
-  }
-
-  .bed-grid{
-    grid-template-columns:repeat(3,minmax(0,1fr));
-  }
-}
-
-@media(max-width:520px){
-  .bed-grid{
-    grid-template-columns:repeat(2,minmax(0,1fr));
-  }
-}
-
-
-/* ===== 朝一患者一覧 印刷 Ver.1.0.5 ===== */
-.morning-print{display:none}
-@media print{
-  @page{size:A4 portrait;margin:4.5mm 5mm}
-  html,body{margin:0!important;padding:0!important;background:#fff!important}
-  body>*:not(.morning-print){display:none!important}
-  .morning-print{display:block!important;color:#000;background:#fff;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}
-  .morning-page{display:block;width:100%;height:auto!important;min-height:0!important;overflow:visible!important;break-after:page;page-break-after:always}
-  .morning-page:last-child{break-after:auto;page-break-after:auto}
-  .morning-head{height:7mm;display:flex;align-items:flex-start;justify-content:space-between;gap:4mm;white-space:nowrap}
-  .morning-head h1{font-size:13pt;line-height:1;margin:0;font-weight:800}
-  .morning-head div{font-size:7pt;line-height:1.2}
-  .morning-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:5.8pt;line-height:1}
-  .morning-table th,.morning-table td{border:.35pt solid #000;text-align:center;vertical-align:middle;padding:0 .5mm;white-space:nowrap;overflow:hidden;text-overflow:clip}
-  .morning-table th{height:8mm;background:#eee!important;-webkit-print-color-adjust:exact;print-color-adjust:exact;font-size:5.5pt;font-weight:700}
-  .morning-table td{height:7.5mm}
-  .morning-table tr{break-inside:avoid;page-break-inside:avoid}
-  .morning-table .c-bed{width:5.1%}.morning-table .c-id{width:6.1%}.morning-table .c-name{width:9.7%}.morning-table .c-admit{width:5.6%}.morning-table .c-doc{width:5.1%}.morning-table .c-disease{width:9.7%}.morning-table .c-care{width:5.1%}.morning-table .c-facility{width:12.8%}.morning-table .c-memo{width:27.6%}.morning-table .c-family{width:6.6%}.morning-table .c-days{width:6.6%}
-}
-
-/* Ver.1.0.8: show every patient assigned to the same bed */
-.duplicate-bed{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:8px}
-.duplicate-bed .bed-line{align-self:stretch;text-align:left}
-.duplicate-bed strong{font-size:15px}
-.duplicate-list{padding:14px;max-width:850px;margin:auto;display:flex;flex-direction:column;gap:12px}
-.duplicate-patient{display:flex;flex-direction:column;gap:10px}
-.duplicate-patient .patient-card{cursor:default}
-.duplicate-open{align-self:flex-start}
-
-/* v1.0.9: visible duplicate indicator and inline bed reassignment */
-.duplicate-bed strong,.duplicate-warning{color:#c62828;font-weight:800}
-.duplicate-patient-row{display:flex;gap:12px;align-items:flex-start}
-.duplicate-patient-info{flex:1;min-width:0}
-.duplicate-move{width:155px;display:flex;flex-direction:column;gap:8px;flex-shrink:0}
-.duplicate-move label{font-size:13px;font-weight:700}
-.duplicate-bed-select{max-width:100%;min-height:40px;border:1px solid #aaa;border-radius:8px;background:white;padding:5px}
-.duplicate-move-save{white-space:normal}
-@media(max-width:520px){.duplicate-patient-row{flex-wrap:wrap}.duplicate-move{width:100%;flex-direction:row;align-items:center;flex-wrap:wrap}.duplicate-move label{width:100%}.duplicate-bed-select{flex:1;min-width:100px}}
-
-/* Approved 67-bed demo layout: room cards in a vertical stack. */
-.general-room-map{display:flex!important;flex-direction:column;gap:11px;min-width:0}
-.general-room-map>.standard-room{display:block;min-width:0;grid-column:auto!important}
-.general-room-map .room-block{background:#fff;border:1px solid #dce4ed;border-radius:13px;padding:11px;min-width:0;box-shadow:0 1px 5px #21354d0b}
-.general-room-map .room-title{font-size:16px;margin-bottom:9px;color:#23334b}
-.general-room-map .standard-room .bed-grid{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(148px,1fr);grid-template-columns:none!important;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:4px}
-.general-room-map .bed-slot{min-width:0;min-height:76px;padding:8px;border:1px solid #d6e1ee;border-radius:10px;gap:4px}
-.general-room-map .occupied-bed{background:#f1f7ff}
-.general-room-map .empty-bed{background:#f8fafc;border-style:dashed;opacity:1}
-.general-room-map .bed-slot b{font-size:11px;color:#426c99}
-.general-room-map .bed-slot strong{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
-.general-room-map .bed-meta.admission-line{display:grid!important;grid-template-columns:auto minmax(0,1fr) auto;gap:5px;align-items:center;width:100%;max-width:100%;font-size:11px!important;white-space:nowrap;overflow:hidden}
-.general-room-map .admission-line .doctor{min-width:0;overflow:hidden;text-overflow:ellipsis;text-align:center}
-.general-room-map .admission-line .days{white-space:nowrap;font-weight:700;color:#185e9d}
-.general-room-map .compact-room-guide{font-size:12px;color:#61728a;margin-top:4px;padding:2px 4px}
-.general-room-map .compact-room-guide span{font-weight:700;color:#185e9d}
-.general-room-map .compact-room-scroll{display:block;min-width:0;width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;padding-bottom:7px;scrollbar-width:auto}
-.general-room-map .compact-room-row{display:flex;align-items:stretch;gap:10px;width:max-content;min-width:max-content}
-.general-room-map .compact-room-row .compact-room{flex:none;width:172px;min-width:172px}
-.general-room-map .compact-room-row .two-bed-room{width:330px;min-width:330px}
-.general-room-map .compact-room-row .room-block{height:100%;padding:11px}
-.general-room-map .compact-room-row .bed-grid{display:grid;grid-template-columns:minmax(0,1fr)!important;gap:7px}
-.general-room-map .compact-room-row .two-bed-room .bed-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-.general-room-map .compact-room-row .bed-slot{width:100%}
-@media(max-width:600px){.general-room-map .room-block{padding:9px}.general-room-map .compact-room-row{gap:8px}}
-
-/* Layout demo parity: explicit full-width room rows. */
-#patientList .general-room-map{display:flex!important;flex-direction:column!important;gap:12px!important;width:100%;min-width:0}
-#patientList .general-room-map>.standard-room{display:block!important;width:100%!important;min-width:0!important}
-#patientList .general-room-map>.standard-room .bed-grid{display:grid!important;grid-auto-flow:column!important;grid-auto-columns:minmax(148px,1fr)!important;grid-template-columns:none!important;overflow-x:auto!important}
-#patientList .general-room-map>.compact-room-scroll{width:100%!important;overflow-x:auto!important}
-#patientList .general-room-map .compact-room-row{display:flex!important;flex-wrap:nowrap!important;width:max-content!important}
-#patientList .general-room-map .compact-room-row>.compact-room{display:block!important;flex:0 0 172px!important}
-#patientList .general-room-map .compact-room-row>.two-bed-room{flex-basis:330px!important}
-#patientList .general-room-map .compact-room-row .two-bed-room .bed-grid{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;grid-auto-flow:row!important}
-#patientList .general-room-map .compact-room-row .compact-room:not(.two-bed-room) .bed-grid{display:grid!important;grid-template-columns:minmax(0,1fr)!important;grid-auto-flow:row!important}
-
-/* iPad mini fit-to-width ward map: no horizontal clipping of official beds. */
-#patientList .general-room-map>.standard-room .bed-grid{
-  display:grid!important;grid-auto-flow:row!important;grid-auto-columns:auto!important;
-  grid-template-columns:repeat(6,minmax(0,1fr))!important;
-  overflow-x:visible!important;gap:4px!important;
-}
-#patientList .general-room-map>.standard-room:has(.bed-grid>.bed-slot:nth-child(7)) .bed-grid{
-  grid-template-columns:repeat(7,minmax(0,1fr))!important;
-}
-#patientList .general-room-map>.compact-room-scroll{overflow-x:visible!important;padding-bottom:0!important}
-#patientList .general-room-map .compact-room-row{
-  display:grid!important;grid-template-columns:2fr 2fr 1fr 1fr 1fr!important;
-  width:100%!important;min-width:0!important;gap:5px!important;
-}
-#patientList .general-room-map .compact-room-row>.compact-room,
-#patientList .general-room-map .compact-room-row>.two-bed-room{
-  width:auto!important;min-width:0!important;flex-basis:auto!important;
-}
-#patientList .general-room-map .compact-room-row .room-block{padding:5px!important}
-#patientList .general-room-map .compact-room-row .bed-grid{gap:3px!important}
-#patientList .general-room-map .compact-room-guide{display:none!important}
-#patientList .icu-map{display:flex!important;flex-direction:column!important;gap:11px!important;min-width:0}
-#patientList .icu-map>.room-block{width:100%;min-width:0}
-#patientList .icu-map>.room-block .bed-grid{display:grid!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;gap:4px!important}
-#patientList .icu-map>.room-block:has(.bed-grid>.bed-slot:nth-child(9)) .bed-grid{grid-template-columns:repeat(9,minmax(0,1fr))!important}
-#patientList .general-room-map .bed-slot,#patientList .icu-map .bed-slot{
-  min-width:0!important;min-height:76px;padding:5px 3px!important;gap:3px!important;overflow:hidden;
-}
-#patientList .general-room-map .bed-slot b,#patientList .icu-map .bed-slot b{font-size:clamp(8px,1.4vw,11px)!important;overflow-wrap:anywhere}
-#patientList .general-room-map .bed-slot strong,#patientList .icu-map .bed-slot strong{font-size:clamp(10px,1.65vw,14px)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
-#patientList .general-room-map .bed-meta.admission-line,#patientList .icu-map .bed-meta.admission-line{display:flex!important;justify-content:space-between;gap:2px!important;white-space:nowrap;font-size:clamp(7px,1.1vw,10px)!important;min-width:0}
-#patientList .general-room-map .bed-meta.admission-line>* ,#patientList .icu-map .bed-meta.admission-line>*{min-width:0;overflow:hidden;text-overflow:ellipsis}
-#patientList .general-room-map .bed-slot .tags,#patientList .icu-map .bed-slot .tags{display:none!important}
-#patientList .general-room-map .room-title,#patientList .icu-map .room-title{font-size:14px;margin-bottom:5px}
-@media(max-width:800px){
-  #patientList .general-room-map .room-block,#patientList .icu-map .room-block{padding:6px}
-  #patientList .general-room-map>.standard-room .bed-grid,#patientList .icu-map .bed-grid{gap:3px!important}
-  #patientList .general-room-map .compact-room-row{gap:3px!important}
-}
-
-/* 20261013c: iPad mini viewport fit — ICU full width, small rooms no intrinsic overflow. */
-#patientList .icu-map{display:grid!important;grid-template-columns:minmax(0,1fr)!important;width:100%!important;gap:10px!important}
-#patientList .icu-map>.room-block{grid-column:1 / -1!important;min-width:0!important;width:100%!important}
-#patientList .icu-map>.room-block .bed-grid{display:grid!important;grid-auto-flow:row!important;grid-template-columns:repeat(7,minmax(0,1fr))!important;min-width:0!important;width:100%!important;overflow:visible!important}
-#patientList .icu-map>.room-block:nth-child(3) .bed-grid{grid-template-columns:repeat(9,minmax(0,1fr))!important}
-#patientList .general-room-map>.compact-room-scroll{max-width:100%!important;min-width:0!important;overflow-x:clip!important}
-#patientList .general-room-map .compact-room-row{display:grid!important;grid-template-columns:minmax(0,2fr) minmax(0,2fr) repeat(3,minmax(0,1fr))!important;width:100%!important;max-width:100%!important;min-width:0!important;gap:3px!important}
-#patientList .general-room-map .compact-room-row>.compact-room{min-width:0!important;width:100%!important;max-width:100%!important;overflow:hidden!important}
-#patientList .general-room-map .compact-room-row .room-block{min-width:0!important;max-width:100%!important;overflow:hidden!important;padding:3px!important}
-#patientList .general-room-map .compact-room-row .bed-grid{min-width:0!important;width:100%!important;grid-auto-columns:minmax(0,1fr)!important}
-#patientList .general-room-map .compact-room-row .two-bed-room .bed-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}
-#patientList .general-room-map .compact-room-row .bed-slot{min-width:0!important;width:100%!important;padding:3px 1px!important;overflow:hidden!important}
-#patientList .general-room-map .compact-room-row .room-title{font-size:clamp(9px,1.5vw,13px)!important;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#patientList .general-room-map .compact-room-row .bed-slot b{font-size:clamp(7px,1vw,10px)!important}
-#patientList .general-room-map .compact-room-row .bed-slot strong{font-size:clamp(8px,1.3vw,12px)!important}
-#patientList .general-room-map .compact-room-row .admission-line{font-size:clamp(6px,0.85vw,9px)!important}
-
-.preview-warning{font-size:12px;font-weight:700;color:#9a3412;background:#fff7ed;border:1px solid #fed7aa;border-radius:8px;padding:5px 8px}.lockcard .preview-warning{line-height:1.5}
-@media(max-width:750px){.topbar .preview-warning{font-size:10px;padding:4px}}
-@media print{.preview-warning{display:none!important}}
-
-/* Ver.1.0.12: accessible compact grouped bed picker and journal table */
-.bed-picker-shade{position:fixed;inset:0;background:rgba(20,30,45,.27);z-index:20000;display:flex;align-items:center;justify-content:center;padding:14px}
-.bed-picker-panel{width:min(420px,100%);max-height:min(75vh,620px);background:white;border-radius:14px;box-shadow:0 8px 30px #0003;display:flex;flex-direction:column;overflow:hidden}
-.bed-picker-head{padding:12px 14px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid #ddd}
-.bed-picker-scroll{overflow-y:auto;padding:12px;overscroll-behavior:contain}
-.bed-picker-room{margin-top:12px;border-top:1px solid #bbb;padding-top:9px}
-.bed-picker-room h3{font-size:15px;margin:0 0 8px;color:#334155}
-.bed-picker-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px}
-.bed-picker-choice{min-height:40px;border:1px solid #aeb8c5;border-radius:7px;background:#fff;color:#18263a;font-size:14px;font-weight:600;padding:6px;cursor:pointer}
-.bed-picker-choice.chosen{background:#e5f0ff;border:2px solid #2870c8}
-.bed-picker-scroll>.bed-picker-choice{width:100%;text-align:left;padding-left:12px}
-.journal-warning{border:2px solid #b56d14}
-.journal-photo{display:inline-block;cursor:pointer}
-.journal-table-wrap{overflow-x:auto}
-.journal-table{width:100%;border-collapse:collapse;font-size:14px;min-width:370px}
-.journal-table th,.journal-table td{padding:10px 7px;border-bottom:1px solid #dce1e7;text-align:left;vertical-align:middle}
-.journal-table th{background:#f1f5f9;font-weight:700}
-.journal-bed-btn{white-space:nowrap;font-size:13px;padding:8px 10px}
-.journal-add-toggle{margin-top:12px;width:100%}
-.journal-entry{background:#f1f5f9;border-radius:10px;margin-top:12px;padding:13px}
-.journal-entry h3{font-size:16px;margin:0 0 10px}
-.journal-entry-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px}
-.journal-entry-fields label{display:flex;flex-direction:column;gap:5px;font-weight:600}
-.journal-entry-fields input{width:100%;min-width:0}
-.journal-entry-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px}
-.duplicate-bed-pick{min-height:40px;white-space:normal}
-
-/* v1.0.13 scan experiment */
-.journal-scan-preview{margin-top:12px;display:grid;gap:10px}.journal-scan-preview img{max-width:100%;max-height:420px;object-fit:contain;border:1px solid #ddd;border-radius:8px}.journal-scan-preview textarea{display:block;width:100%;box-sizing:border-box;margin-top:6px;min-height:110px;font:inherit;padding:9px}
-
-.bed-picker-top{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
-.bed-picker-top .bed-picker-choice{width:100%;font-size:13px;padding:7px 3px}
-.discharge-choice{border-color:#c66;color:#9c2424;background:#fff8f8}
-.discharge-content{padding:18px;display:grid;gap:14px;overflow:auto}
-.discharge-content label{display:grid;gap:8px;font-weight:600}
-.discharge-content input[type=date]{min-height:42px;font-size:16px}
-
-.journal-actions{display:flex;gap:4px;align-items:center;white-space:nowrap}.journal-actions .btn{padding:7px 8px;font-size:12px}
-
-/* Ver.1.0.17: reserve real space below scroll content for the fixed iPad navigation. */
-.shell{padding-bottom:0!important;min-height:100vh;min-height:100dvh}
-.content{padding-bottom:calc(145px + env(safe-area-inset-bottom))!important}
-#main{padding-bottom:16px}
-.archive-list{display:grid;gap:10px}.archive-item{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.archive-actions{display:flex;flex-wrap:wrap;gap:6px}
-@media(max-width:600px){.archive-item{align-items:flex-start;flex-direction:column}}
-
-/* Ver.1.0.18: autosave feedback beside patient details, iPad mini friendly. */
-.patient-sheet-title{min-width:0}
-.patient-sheet-title h2{overflow-wrap:anywhere}
-.patient-save-status{font-size:12px;line-height:1.4;white-space:nowrap;border-radius:9px;padding:7px 9px;background:#ecfdf5;color:#047857;font-weight:700}
-.patient-save-status[data-state="pending"],.patient-save-status[data-state="saving"]{background:#fffbeb;color:#92400e}
-.patient-save-status[data-state="error"]{background:#fff1f2;color:#b91c1c;white-space:normal}
-@media(max-width:680px){.sheethead{flex-wrap:wrap}.sheethead .spacer{flex-basis:0}.patient-save-status{order:5;margin-left:45px}.sheethead #saveP{font-size:12px;padding:9px 10px}}
-
-
-/* Ver.1.0.19: compact, editable patient overview for iPad mini. */
-/* Keep the tab rail within the modal; only the content zone scrolls if necessary. */
-#modal .sheet{display:flex;flex-direction:column;overflow:hidden;height:100%;height:100dvh}
-#modal .sheethead,#modal .tabs{position:relative;top:auto;flex-shrink:0}
-#modal .tabs{scrollbar-width:thin;overscroll-behavior-x:contain}
-#modal .sheetbody{flex:1;min-height:0;overflow-y:auto;overscroll-behavior-y:contain;-webkit-overflow-scrolling:touch;width:100%;max-width:1100px;padding:10px 12px calc(16px + env(safe-area-inset-bottom))}
-.basic-dashboard{display:grid;grid-template-columns:minmax(0,1.85fr) minmax(230px,1fr);gap:10px;align-items:start}
-.basic-information,.basic-photo-card,.basic-admission-card{min-width:0;border:1px solid var(--line);background:#fff;border-radius:12px;padding:10px}
-.basic-form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px 10px;align-items:start}
-.basic-field{min-width:0}
-.basic-field.basic-wide{grid-column:span 2}
-.basic-field label{font-weight:700;font-size:11px;color:#485e61;margin-bottom:3px}
-.basic-field input,.basic-field select,.basic-field textarea{padding:7px 9px;min-height:35px;border-radius:8px;font-size:14px;line-height:1.3}
-.basic-field textarea{height:48px;min-height:48px;resize:vertical}
-.basic-field input:focus,.basic-field textarea:focus{outline:2px solid rgba(20,184,166,.28);border-color:var(--brand)}
-.basic-bed-picker{font-size:13px;padding:7px 9px;width:100%;min-height:35px;text-align:left;white-space:normal}
-.basic-readonly{border:1px solid #d8e7e4;border-radius:8px;background:#edf8f6;color:#155e59;font-size:14px;font-weight:700;padding:7px 9px;min-height:35px}
-.basic-docs{display:grid;gap:10px;min-width:0}
-.basic-card-title{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:14px;margin-bottom:7px}
-.basic-card-title span{font-size:11px;color:var(--muted);white-space:nowrap}
-.basic-gen-preview{width:100%;height:clamp(180px,32vh,310px);background:#f7fafb;border:1px solid var(--line);border-radius:9px;display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;line-height:1.7;overflow:hidden;padding:5px}
-.basic-gen-preview img{display:block;width:100%;height:100%;object-fit:contain}
-.basic-gen-preview img[hidden]{display:none}
-.basic-gen-preview:focus-visible,.basic-admission-open:focus-visible{outline:3px solid var(--brand2)}
-.basic-admission-open{border:1px solid var(--line);border-radius:9px;background:#f7fafb;display:flex;align-items:center;gap:9px;padding:12px 10px;min-height:64px;width:100%;text-align:left;font-size:13px;font-weight:700;color:var(--ink)}
-.basic-document-icon{font-size:22px}
-.basic-admission-open span:nth-child(2){flex:1;min-width:0}
-.basic-admission-open small{display:block;font-size:11px;color:var(--muted);font-weight:400;margin-top:3px}
-.basic-admission-open span:last-child{font-size:22px;color:var(--brand)}
-@media(min-width:900px) and (max-height:800px){
-  #modal .sheethead{padding-top:8px;padding-bottom:8px}
-  #modal .tabs{padding-top:5px;padding-bottom:5px}
-  .basic-gen-preview{height:clamp(160px,27vh,220px)}
-}
-@media(max-width:680px){
-  .basic-dashboard{grid-template-columns:1fr}
-  .basic-docs{grid-template-columns:repeat(2,minmax(0,1fr))}
-  .basic-gen-preview{height:190px}
-}
-@media(max-width:420px){.basic-form-grid{grid-template-columns:1fr}.basic-field.basic-wide{grid-column:span 1}.basic-docs{grid-template-columns:1fr}}
-
-.basic-extra{margin-top:9px;border-top:1px solid var(--line);padding-top:6px}
-.basic-extra summary{cursor:pointer;color:var(--brand);font-size:12px;font-weight:700;padding:4px 0;line-height:1.5}
-.basic-extra-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin-top:8px}
-@media(max-width:420px){.basic-extra-grid{grid-template-columns:1fr}.basic-extra-grid .span2{grid-column:span 1}}
-
-/* Ver.1.0.21 MVP01: daily work overview and optional deadlines */
-.mvp-task-label{display:block;font-weight:700;margin:12px 0 8px}
-.mvp-task-label input{display:block;width:100%;margin-top:5px}
-.mvp-task-options{display:flex;flex-wrap:wrap;align-items:end;gap:10px;margin-bottom:8px}
-.mvp-task-options>label{display:flex;flex-direction:column;gap:4px;font-weight:650;font-size:13px}
-.mvp-task-options .mvp-urgent{flex-direction:row;align-items:center;padding:8px 0;font-size:14px}
-.mvp-task-options input[type="date"]{min-height:42px}
-.mvp-task-options .btn{min-height:44px}
-.mvp-kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:12px 0 18px}
-.mvp-kpi{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px;display:flex;flex-direction:column;gap:4px}
-.mvp-kpi b{font-size:25px}.mvp-kpi span{font-size:12px;color:var(--muted)}
-.mvp-task-group{margin-bottom:13px}.mvp-task-group h3{margin-top:0}
-.mvp-count{font-size:13px;color:var(--muted);font-weight:600}
-button.mvp-taskjump{width:100%;border:0;border-bottom:1px solid var(--line);background:transparent;font:inherit;color:inherit;cursor:pointer;text-align:left;min-height:57px}
-button.mvp-taskjump:hover{background:var(--bg)}
-.mvp-task-summary{display:block;min-width:0;flex:1}
-.mvp-task-copy{display:block;overflow-wrap:anywhere;margin-top:4px}
-.mvp-task-status{display:inline-flex;flex-wrap:wrap;gap:5px;margin-top:5px;font-size:12px}
-.mvp-due,.mvp-priority{display:inline-block;border-radius:6px;padding:2px 6px;background:#eef2f7;color:#334155;font-size:12px}
-.mvp-due.overdue{background:#fee2e2;color:#991b1b;font-weight:700}
-.mvp-due.today{background:#fef3c7;color:#92400e;font-weight:700}
-.mvp-due.future{background:#e0f2fe;color:#075985}
-.mvp-priority{background:#fce7f3;color:#9d174d;font-weight:700}
-@media(max-width:700px){.mvp-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}}
-
-/* Security draft: hide all patient data while app is being background-locked. */
-body.msw-private { visibility: hidden !important; }
-</style></head><body>
-<div id="app"><div style="padding:24px;color:#b91c1c;font-weight:700">架空データ専用の画面を読み込み中です。実際の患者情報は入力しないでください。</div></div>
-<input id="fileInput" type="file" hidden>
-<script>'use strict';
+'use strict';
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const enc=new TextEncoder(), dec=new TextDecoder();
-const DB_NAME='mswdb_mvp01_rc3m_pin6_recovery_fictional_20261021', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
+const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PIN6-NEW-FAKE';
-// NOTE: THIS BUNDLE IS FICTIONAL-DATA ONLY. An operator-provided host-specific
-// release must be built after authorization. Code cannot verify medical consent.
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-RELEASE-CANDIDATE';
+// RELEASE CANDIDATE, NOT YET AUTHORIZED FOR REAL PATIENT INPUT.
+// Requires deployment-origin cleanup, iPad mini verification and operational approval.
 const DEPLOYMENT_POLICY=Object.freeze({
   origin:'https://msw-ipadmini-app.github.io',
-  basePath:'/pin6-test/',
-  fictionalOnly:true
+  basePath:'/',
+  releaseCandidate:true
 });
 function deploymentLocationAllowed(loc){
-  if(!DEPLOYMENT_POLICY.fictionalOnly)return false;
-  // Single-file preview is test-only; not a clinical origin allowlist.
-  // In a secure browser context the file can be previewed without an actual deployment.
-  return Boolean(loc && loc.protocol==='https:' && loc.hostname==='msw-ipadmini-app.github.io' && (loc.pathname==='/pin6-test/' || loc.pathname==='/pin6-test/index.html'));
+  if(!DEPLOYMENT_POLICY.releaseCandidate)return false;
+  if(!loc || loc.origin!==DEPLOYMENT_POLICY.origin)return false;
+  const path=loc.pathname;
+  return path===DEPLOYMENT_POLICY.basePath || path===DEPLOYMENT_POLICY.basePath+'index.html';
 }
 
 
@@ -685,25 +252,23 @@ async function save(){
 }
 function blankState(){return{version:APP_VERSION,patients:[],drugs:[],masters:{},settings:{retentionDays:null,autoLockMin:5,lastBackupAt:null},createdAt:nowISO(),updatedAt:nowISO()}}
 async function init(){
-  // Fail closed before even opening IndexedDB: only the exact, approved
-  // fictional-data testing origin/path can start this release.
-  // This check is NOT a same-origin security boundary. Clinical releases require
-  // their own origin, controlled code delivery and a separate approval process.
+  // Fail closed before opening IndexedDB unless the exact dedicated release URL matches.
+  // URL checks alone DO NOT prove that the host or running code is trustworthy.
   if(!deploymentLocationAllowed(location)){
     document.getElementById('app').textContent =
-      '配信先が承認済みの架空データ検証URLと一致しないため、保存領域を開かず起動を停止しました。';
+      '専用配信URLと一致しないため、保存領域を開かず起動を停止しました。';
     return;
   }
   if(typeof isSecureContext==='boolean'&&!isSecureContext){
     document.getElementById('app').textContent='HTTPSの安全な接続が必要です。';
     return;
   }
-  await openDB();meta=await idbGet('meta');/* standalone fictional preview: no service worker registration *//* no persistent-storage permission request in preview */renderLock()}
-function renderLock(msg=''){document.getElementById('morningPrint')?.remove();const fresh=!meta;$('#app').innerHTML=`<div class="lockwrap"><div class="lockcard"><h1>MSW患者管理</h1><p style="font-weight:700">架空データ検証用 Ver.${APP_VERSION}</p><p>${fresh?'初回設定：この端末用の暗証を作成します。':'暗証を入力してロック解除してください。'}</p>${msg?`<div class="alert">${esc(msg)}</div>`:''}<input id="pin" type="password" inputmode="text" autocomplete="off" placeholder="6文字以上・文字と数字" /><button class="btn" id="unlock" style="width:100%">${fresh?'暗証を設定':'ロック解除'}</button><p class="notice">このページは以前のテスト版とは別の新しい架空データ保存領域です。以前のデータは消さず、引き継ぎもしません。実際の患者情報は入力しないでください。氏名・病名は登録できますが、住所・電話番号・連絡先の専用項目は保存しません。端末内で暗号化して保存します。暗証を忘れると復旧できません。6文字の暗証は架空データ検証専用であり、実患者情報の保護には使用しないでください。端末自体のパスコード・紛失対策も必ず有効にしてください。</p></div></div>`;$('#unlock').onclick=fresh?setup:unlock;$('#pin').onkeydown=e=>{if(e.key==='Enter')$('#unlock').click()};setTimeout(()=>$('#pin').focus(),80)}
-function strongNewPin(pin){return typeof pin==='string'&&pin.length>=6&&/[0-9]/.test(pin)&&/\p{L}/u.test(pin)}
+  await openDB();meta=await idbGet('meta');if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(r=>r.update().catch(()=>{})).catch(()=>{});try{if(navigator.storage?.persist)await navigator.storage.persist()}catch(e){}renderLock()}
+function renderLock(msg=''){document.getElementById('morningPrint')?.remove();const fresh=!meta;$('#app').innerHTML=`<div class="lockwrap"><div class="lockcard"><h1>MSW患者管理</h1><p style="font-weight:700">実務導入候補・未承認 Ver.${APP_VERSION}</p><p>${fresh?'初回設定：この端末用の暗証を作成します。':'暗証を入力してロック解除してください。'}</p>${msg?`<div class="alert">${esc(msg)}</div>`:''}<form id="authForm" autocomplete="on"><input type="text" name="username" autocomplete="username" value="msw-local" readonly aria-label="ローカルアプリ" style="position:absolute;left:-9999px;width:1px;height:1px" /><input id="pin" name="password" type="password" inputmode="text" autocomplete="${fresh?'new-password':'current-password'}" placeholder="12文字以上・文字と数字" /><button class="btn" id="unlock" type="submit" style="width:100%">${fresh?'暗証を設定':'ロック解除'}</button></form><p class="notice">この画面は過去のテスト版と異なる専用保存領域を使います。最終確認と運用承認が終わるまで実患者情報を入力しないでください。氏名・病名は登録できますが、住所・電話番号・連絡先の専用項目は保存しません。端末内で暗号化して保存します。暗証を忘れると復旧できません。端末が対応していればiPadのパスワード自動入力を利用できます（利用可否は端末環境によります）。端末自体のパスコード・紛失対策も必ず有効にしてください。</p></div></div>`;$('#authForm').onsubmit=e=>{e.preventDefault();void (fresh?setup():unlock());};setTimeout(()=>$('#pin').focus(),80)}
+function strongNewPin(pin){return typeof pin==='string'&&pin.length>=12&&/[0-9]/.test(pin)&&/\p{L}/u.test(pin)}
 async function setup(){
   const pin=$('#pin').value;
-  if(!strongNewPin(pin))return renderLock('暗証は6文字以上で、数字と文字を組み合わせてください。');
+  if(!strongNewPin(pin))return renderLock('暗証は12文字以上で、数字と文字を組み合わせてください。');
   try{
     // Missing authentication metadata must never silently orphan old encrypted photos.
     // Reject *any* pre-existing record before generating new authentication keys.
@@ -836,7 +401,7 @@ async function applySafePwaUpdate(){
     location.reload();
   }catch(e){alert('アプリを更新できません：'+(e.message||e))}
 }
-function render(){resetAutoLock();const net=navigator.onLine?'通信あり':'通信なし';$('#app').innerHTML=`<div class="shell"><header class="topbar"><div class="brand">MSW患者管理</div><span class="pill" style="background:#b91c1c;color:#fff">架空患者限定・実患者入力禁止 Ver.${APP_VERSION}</span><span class="pill">${net}</span>${window.MSW_PWA_UPDATE_PENDING?'<button class="pill" id="safeUpdateBtn" type="button">更新可能</button>':''}<div class="spacer"></div><button class="pill" id="lockBtn">🔒</button></header><main class="content" id="main"></main><nav class="bottomnav"><button class="navbtn ${(screen==='patients'||screen==='archive')?'active':''}" data-screen="patients"><span class="ico">🏥</span>患者</button><button class="navbtn ${screen==='journal'?'active':''}" data-screen="journal"><span class="ico">📄</span>日誌</button><button class="navbtn ${screen==='tasks'?'active':''}" data-screen="tasks"><span class="ico">✅</span>今日・要対応</button><button class="navbtn ${screen==='drugs'?'active':''}" data-screen="drugs"><span class="ico">💊</span>薬情</button><button class="navbtn ${screen==='masters'?'active':''}" data-screen="masters"><span class="ico">📋</span>マスター</button><button class="navbtn ${screen==='settings'?'active':''}" data-screen="settings"><span class="ico">⚙️</span>設定</button></nav></div>`;$('#lockBtn').onclick=()=>lock(false);if($('#safeUpdateBtn'))$('#safeUpdateBtn').onclick=applySafePwaUpdate;$$('.navbtn').forEach(b=>b.onclick=()=>{screen=b.dataset.screen;render()});({patients:renderPatients,archive:renderArchive,journal:renderJournalPreview,tasks:renderTasks,drugs:renderDrugs,masters:renderMasters,settings:renderSettings}[screen])()}
+function render(){resetAutoLock();const net=navigator.onLine?'通信あり':'通信なし';$('#app').innerHTML=`<div class="shell"><header class="topbar"><div class="brand">MSW患者管理</div><span class="pill">実務導入候補・未承認 Ver.${APP_VERSION}</span><span class="pill">${net}</span>${window.MSW_PWA_UPDATE_PENDING?'<button class="pill" id="safeUpdateBtn" type="button">更新可能</button>':''}<div class="spacer"></div><button class="pill" id="lockBtn">🔒</button></header><main class="content" id="main"></main><nav class="bottomnav"><button class="navbtn ${(screen==='patients'||screen==='archive')?'active':''}" data-screen="patients"><span class="ico">🏥</span>患者</button><button class="navbtn ${screen==='journal'?'active':''}" data-screen="journal"><span class="ico">📄</span>日誌</button><button class="navbtn ${screen==='tasks'?'active':''}" data-screen="tasks"><span class="ico">✅</span>今日・要対応</button><button class="navbtn ${screen==='drugs'?'active':''}" data-screen="drugs"><span class="ico">💊</span>薬情</button><button class="navbtn ${screen==='masters'?'active':''}" data-screen="masters"><span class="ico">📋</span>マスター</button><button class="navbtn ${screen==='settings'?'active':''}" data-screen="settings"><span class="ico">⚙️</span>設定</button></nav></div>`;$('#lockBtn').onclick=()=>lock(false);if($('#safeUpdateBtn'))$('#safeUpdateBtn').onclick=applySafePwaUpdate;$$('.navbtn').forEach(b=>b.onclick=()=>{screen=b.dataset.screen;render()});({patients:renderPatients,archive:renderArchive,journal:renderJournalPreview,tasks:renderTasks,drugs:renderDrugs,masters:renderMasters,settings:renderSettings}[screen])()}
 function activePatients(){return state.patients.filter(p=>!p.dischargeDate)}
 function getStatus(p){return p.status||'未設定'}
 function statusTag(s){const c=s.includes('要')?'red':s.includes('決定')?'green':s.includes('施設')?'purple':s==='未設定'?'':'orange';return `<span class="tag ${c}">${esc(s)}</span>`}
@@ -1803,8 +1368,8 @@ function diagnosticCheck(name, status, detail=''){
 }
 async function collectEnvironmentDiagnostics(){
   const tests=[];
-  tests.push(diagnosticCheck('架空プレビュー起動確認',deploymentLocationAllowed(location)?'OK':'NG',
-    deploymentLocationAllowed(location)?'架空専用プレビューで起動中（本番環境の確認ではありません）':'架空専用プレビューの起動条件に一致しません'));
+  tests.push(diagnosticCheck('指定URLとの一致',deploymentLocationAllowed(location)?'OK':'NG',
+    deploymentLocationAllowed(location)?'指定した専用URLで起動':'許可されたURL以外です'));
   tests.push(diagnosticCheck('HTTPS/安全なコンテキスト',
     location.protocol==='https:'&&isSecureContext?'OK':'NG',
     location.protocol==='https:'&&isSecureContext?'HTTPSで起動':'HTTPS接続が必要'));
@@ -1831,13 +1396,13 @@ async function collectEnvironmentDiagnostics(){
     tests.push(diagnosticCheck('アプリ資産の事前保存','未確認','キャッシュAPIが利用できません'));
   }else{
     try{
-      const names=(await caches.keys()).filter(name=>name.startsWith('msw-mvp01-sec13-review-only-'));
+      const names=(await caches.keys()).filter(name=>name.startsWith('msw-mvp01-clinical-rc-'));
       const pathRoot=new URL('./',location.href);
       let available=false;
       for(const name of names){
         const cache=await caches.open(name);
         const start=await cache.match(new URL('./index.html',pathRoot).href);
-        const script=await cache.match(new URL('./app.js?v=mvp01-sec13-20261020r3m',pathRoot).href);
+        const script=await cache.match(new URL('./app.js?v=mvp01-sec13-20261021clinicalcandidate',pathRoot).href);
         if(start&&script){available=true;break;}
       }
       tests.push(diagnosticCheck('アプリ資産の事前保存',available?'OK':'要再起動',
@@ -1860,11 +1425,11 @@ async function collectEnvironmentDiagnostics(){
   return tests;
 }
 function formatEnvironmentDiagnostics(tests){
-  return ['MSW-MVP01 sec13 配信・端末診断（架空データ専用）',
+  return ['MSW-MVP01 sec13 配信・端末診断（導入候補）',
     '※この報告は患者情報・暗証番号を含みません。',
     ...tests.map(t=>`[${t.status}] ${t.name}: ${t.detail}`),
     '※実機でのオフライン起動・改ざん対策・勤務先承認は別途必要。',
-    '※GitHub Pages上には実在患者情報を入力しないでください。'].join('\n');
+    '※本診断だけでは運用開始の承認にはなりません。'].join('\n');
 }
 
 // A failed write must never falsely mark the backup as confirmed in RAM.
@@ -1890,15 +1455,15 @@ async function renderSettings(){
   const last=state.settings.lastBackupAt?new Date(state.settings.lastBackupAt).toLocaleString('ja-JP'):'まだありません';
   $('#main').innerHTML=`<div class="hero"><div><h1>設定</h1><p>移行・バックアップ・容量・セキュリティを管理します。</p></div></div>
   <div class="panel"><h3>データ移行</h3><p class="notice">住所・電話番号・連絡先の列はCSVに含まれていても保存しません。氏名・病名・病院ID・FileMaker番号は取り込みます。写真や自由記述の内容は対象外です。</p><div class="settings-row"><div><b>患者CSVを読み込む</b><small>FileMakerの「番号」（必須）で患者を照合。病院の「ＩＤ」は別項目として保持し、タスク・記録・写真も残します。ICU3-10以降は未配置扱い。追加・更新は既存の記録を保持します。必要なときだけ手動でバックアップできます。</small></div><button class="btn secondary" id="impP">読込</button></div><div class="settings-row"><div><b>薬剤CSVを読み込む</b><small>医薬品分類・薬価・薬効・薬名の4列。</small></div><button class="btn secondary" id="impD">読込</button></div></div>
-  <div class="panel"><h3>初回のみ：全件入れ替え（危険・試験用）</h3><div class="settings-row"><div><b>患者CSVで全件入れ替え（記録も消去）</b><small>患者データ・タスク・経過記録・写真をすべて置換します。薬剤・マスター・設定は保持します。患者ID（番号）必須。実行前に件数を確認します。</small></div><button class="btn danger" id="replaceP">全件入れ替え</button></div></div>
+  <div class="panel"><h3>全件入れ替え（危険：現在の記録を全消去）</h3><div class="settings-row"><div><b>患者CSVで全件入れ替え（記録も消去）</b><small>患者データ・タスク・経過記録・写真をすべて置換します。薬剤・マスター・設定は保持します。患者ID（番号）必須。実行前に件数を確認します。</small></div><button class="btn danger" id="replaceP">全件入れ替え</button></div></div>
   <div class="panel"><h3>退院患者の保存</h3><p class="notice">Ver.1.0.17から退院患者の自動削除を停止しました。退院確定後も記録を保存し、患者画面の「退院患者記録」から検索・閲覧・確定取消できます。</p><div class="settings-row"><b>保存中の退院患者</b><span>${state.patients.filter(p=>p.dischargeDate).length}名</span></div></div>
   <div class="panel"><h3>セキュリティ</h3><div class="settings-row"><div><b>自動ロック</b><small>無操作時に暗証画面へ戻ります。</small></div><select id="autolock"><option value="1">1分</option><option value="5">5分</option><option value="10">10分</option><option value="30">30分</option></select></div><div class="settings-row"><div><b>暗証を変更</b><small>現在の暗証を確認後、新しい暗証でDBを再暗号化します。</small></div><button class="btn secondary" id="changePin">変更</button></div></div>
   <div class="panel"><h3>必要時のみ：手動バックアップ</h3><p class="notice">定期バックアップは必須にしません。患者情報を長期間保管する目的ではなく、端末故障時に残したい未完了タスクや記録がある場合、端末変更や全件入替の前など必要な場面で利用します。保存したファイルの管理・削除にも注意してください。</p><div class="settings-row"><div><b>暗号化バックアップ</b><small>患者・薬剤・経過記録・マスターを暗号化したまま書き出します。<br>保存確認済み：${esc(last)}</small></div><button class="btn secondary" id="backup">書出</button></div><div class="settings-row"><div><b>ファイルへの保存確認</b><small>「ファイル」アプリに .mswdb があることを実際に確認してから押してください。復元成功の証明ではありません。</small></div><button class="btn secondary" id="backupVerified">保存確認済み</button></div><div class="settings-row"><div><b>バックアップ復元</b><small>.mswdb ファイルを読み込みます。</small></div><button class="btn secondary" id="restore">復元</button></div></div>
   <div class="panel"><h3>端末保存</h3><div class="settings-row"><div><b>保存領域</b><small>${esc(persisted)} / 使用量 ${humanBytes(usage)}${quota?' / 上限目安 '+humanBytes(quota):''}</small></div><button class="btn secondary" id="persist">保持を要求</button></div><div class="storagebar"><div style="width:${pct}%"></div></div><p class="notice">iPadではホーム画面から起動してください。写真・PDFの元画像は暗号化して端末内に保存します。端末故障・データ消失時はバックアップなしでは復元できません。必要性と保存先は勤務先の運用方針に従って判断してください。</p></div>
-  <div class="panel"><h3>配信・端末の診断（架空データ専用）</h3><p class="notice">ボタン1回でURL・オフライン用の保存準備・暗号化データの読取などを点検します。患者氏名・病名・記録・暗証は報告に含めません。これは実際のオフライン動作や実務利用の安全性を証明するものではありません。</p><button class="btn secondary" id="runEnvDiagnostics" type="button">環境を診断</button> <button class="btn secondary" id="copyEnvDiagnostics" type="button" hidden>結果をコピー</button><pre id="envDiagnosticsResult" class="notice" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status" aria-live="polite"></pre></div>
+  <div class="panel"><h3>配信・端末の診断（導入候補）</h3><p class="notice">ボタン1回でURL・オフライン用の保存準備・暗号化データの読取などを点検します。患者氏名・病名・記録・暗証は報告に含めません。これは実際のオフライン動作や実務利用の安全性を証明するものではありません。</p><button class="btn secondary" id="runEnvDiagnostics" type="button">環境を診断</button> <button class="btn secondary" id="copyEnvDiagnostics" type="button" hidden>結果をコピー</button><pre id="envDiagnosticsResult" class="notice" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status" aria-live="polite"></pre></div>
   <div class="panel"><h3>ソフト本体の復旧（患者データとは別）</h3><p class="notice">iPad miniが故障した場合、管理された配信先に保管済みの同じプログラムを新しい端末で開き、ホーム画面に追加できます。アプリ本体は再設置できますが、端末内の患者・タスク・記録は自動復旧しません。患者情報は電子カルテ等から再入力し、暗号化バックアップがある場合のみ別途復元します。配信先やプログラムが消えたときは、管理者が検証済み復旧キットから再配信する必要があります。</p><button class="btn secondary" id="recoverGuide" type="button">復旧手順を表示</button></div>
   <div class="panel"><h3>初期化</h3><div class="settings-row"><div><b>この端末のMSW-DBを全消去</b><small>患者・薬剤・マスター・暗証をすべて削除します。復元にはバックアップが必要です。</small></div><button class="btn danger" id="resetAll">全消去</button></div></div>
-  <div class="panel"><div class="notice">MSW-DB 架空データ検証用 Ver.${APP_VERSION} / 在院 ${activePatients().length}人 / 薬剤 ${state.drugs.length}件</div></div>`;
+  <div class="panel"><div class="notice">MSW-DB 実務導入候補・未承認 Ver.${APP_VERSION} / 在院 ${activePatients().length}人 / 薬剤 ${state.drugs.length}件</div></div>`;
   $('#autolock').value=String(state.settings.autoLockMin??5);
   $('#autolock').onchange=async e=>{state.settings.autoLockMin=+e.target.value;await save();resetAutoLock()};
   $('#replaceP').onclick=()=>pickFile('.csv',replacePatientsFromFileMaker);
@@ -1921,7 +1486,7 @@ async function renderSettings(){
     }catch(e){result.textContent='診断を完了できませんでした。アプリを開き直して再実行してください。';}
     finally{btn.disabled=false;}
   };
-  $('#recoverGuide').onclick=()=>alert('【ソフト本体の再設置】\n1. 管理者が保管した同一バージョンの配信URLを確認\n2. 新しいiPad miniのSafariでそのURLを開く\n3. ホーム画面に追加\n4. 初期暗証を設定\n5. 電子カルテなどから必要な情報だけを再入力\n\n注意：患者・タスク・経過記録は自動で復元しません。紛失した端末のデータはこの操作では取り戻せません。公開テスト版には架空患者のみを入力してください。');
+  $('#recoverGuide').onclick=()=>alert('【ソフト本体の再設置】\n1. 管理者が保管した同一バージョンの配信URLを確認\n2. 新しいiPad miniのSafariでそのURLを開く\n3. ホーム画面に追加\n4. 初期暗証を設定\n5. 電子カルテなどから必要な情報だけを再入力\n\n注意：患者・タスク・経過記録は自動で復元しません。紛失した端末のデータはこの操作では取り戻せません。本番設置前のテスト版には架空患者のみを入力してください。');
   $('#resetAll').onclick=resetAll;
 }
 async function changePin(){
@@ -1930,7 +1495,7 @@ async function changePin(){
     await beginMaintenance(action);
   const oldPin=prompt('現在の暗証を入力してください'); if(oldPin===null)return;
   try{const oldKey=await derive(oldPin,unb64(meta.salt));await decryptObj(meta.check,oldKey)}catch(e){return alert('現在の暗証が違います。')}
-  const np=prompt('新しい暗証（6文字以上、数字だけでなく文字も使用）を入力してください');if(np===null)return;if(!strongNewPin(np))return alert('新しい暗証は6文字以上で、数字と文字を組み合わせてください。');
+  const np=prompt('新しい暗証（12文字以上、数字だけでなく文字も使用）を入力してください');if(np===null)return;if(!strongNewPin(np))return alert('新しい暗証は12文字以上で、数字と文字を組み合わせてください。');
   const np2=prompt('確認のため新しい暗証をもう一度入力してください');if(np!==np2)return alert('新しい暗証が一致しません。');
   const salt=crypto.getRandomValues(new Uint8Array(16));const newKey=await derive(np,salt);const newMeta={version:1,salt:b64(salt),check:await encryptObj({ok:true},newKey),createdAt:meta.createdAt||nowISO(),changedAt:nowISO()};
   // Re-encrypt every referenced photo together with the patient state and PIN metadata.
@@ -2454,8 +2019,8 @@ let journalEntryOpen=false,journalScanImage=null,journalScanText='',journalScanS
 function renderJournalPreview(){
   const admissions=state.patients.filter(p=>!p.dischargeDate&&p.journalAdmissionPending).sort((a,b)=>String(a.data['入院日']||'').localeCompare(String(b.data['入院日']||'')));
   const entry=`<div class="journal-entry"><h3>新しい患者を手入力</h3><div class="journal-entry-fields"><label>氏名<input id="journalNewName" type="text" autocomplete="off" placeholder="氏名を入力"></label><label>入院日<input id="journalNewDate" type="date" value="${new Date().toLocaleDateString('sv-SE')}"></label><label>ベッド配置先<button class="btn secondary journal-pick" id="journalNewBedPick" type="button">その他・未配置 ▾</button><input type="hidden" id="journalNewBed" value=""></label></div><div class="journal-entry-actions"><button type="button" class="btn secondary" id="journalCancel">キャンセル</button><button type="button" class="btn" id="journalAdd">一覧に追加</button></div></div>`;
-  $('#main').innerHTML=`<div class="hero"><div><h1>日誌・患者情報取り込み</h1><p>架空データ検証用 Ver.${APP_VERSION} ／ 入院患者の手入力と配置</p></div></div>
-  <div class="panel journal-warning"><b>手入力患者は実際の患者管理データに保存されます</b><p>写真の文字認識は未実装です。必ず架空のテスト患者を使ってください。必要なら手動バックアップを利用できます。既存患者と同姓同名の場合は追加前に確認します。</p><label class="btn secondary journal-photo">📷 日誌の写真を選択・撮影<input type="file" id="journalPhoto" accept="image/*" style="display:none"></label><div id="journalPhotoInfo" class="notice"></div><div id="journalScanPreview"></div></div>
+  $('#main').innerHTML=`<div class="hero"><div><h1>日誌・患者情報取り込み</h1><p>実務導入候補・未承認 Ver.${APP_VERSION} ／ 入院患者の手入力と配置</p></div></div>
+  <div class="panel journal-warning"><b>手入力患者は実際の患者管理データに保存されます</b><p>写真の文字認識は未実装です。実務用の導入許可が完了するまでは架空患者だけを使ってください。必要なら手動バックアップを利用できます。既存患者と同姓同名の場合は追加前に確認します。</p><label class="btn secondary journal-photo">📷 日誌の写真を選択・撮影<input type="file" id="journalPhoto" accept="image/*" style="display:none"></label><div id="journalPhotoInfo" class="notice"></div><div id="journalScanPreview"></div></div>
   <div class="panel"><h2>① 入院患者一覧　${admissions.length}名</h2><p class="notice">未配置の患者はここに残ります。ベッドへの配置が完了すると一覧から外れます。</p><div class="journal-table-wrap"><table class="journal-table"><thead><tr><th>氏名</th><th>入院日</th><th>現在地</th><th>配置先</th></tr></thead><tbody>${admissions.map(p=>`<tr><td>${esc(p.data['氏名']||'氏名未入力')}</td><td>${esc(p.data['入院日']||'')}</td><td>${esc(p.data['ベッド番号']||'未配置')}</td><td><button type="button" class="btn secondary journal-bed-btn" data-id="${esc(p.id)}">部屋選択</button></td></tr>`).join('')||'<tr><td colspan="4">ベッド配置待ちの患者はいません</td></tr>'}</tbody></table></div><button type="button" class="btn secondary journal-add-toggle" id="journalEntryToggle">${journalEntryOpen?'− 手入力を閉じる':'＋ 患者を手入力'}</button>${journalEntryOpen?entry:''}</div>
   ${renderPendingDischarges()}`;
   bindPendingDischarges();
@@ -2494,5 +2059,3 @@ function renderJournalPreview(){
   paintScan();
   $('#journalPhoto').onchange=e=>{const f=e.target.files?.[0];if(!f)return;if(!f.type.startsWith('image/')){$('#journalPhotoInfo').textContent='画像ファイルを選択してください。';return}if(f.size>15*1024*1024){$('#journalPhotoInfo').textContent='15MB以下の画像を選んでください。';return}const reader=new FileReader();reader.onload=()=>{journalScanImage=reader.result;journalScanText='';journalScanStatus='写真を読み込みました。文字認識の可否を確認できます。';$('#journalPhotoInfo').textContent='選択した写真：'+f.name;paintScan()};reader.readAsDataURL(f)};
 }
-</script>
-</body></html>
