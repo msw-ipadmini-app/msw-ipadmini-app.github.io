@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-20261021';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-IDKEY1';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -1402,7 +1402,7 @@ async function collectEnvironmentDiagnostics(){
       for(const name of names){
         const cache=await caches.open(name);
         const start=await cache.match(new URL('./index.html',pathRoot).href);
-        const script=await cache.match(new URL('./app.js?v=mvp01-sec13-20261021clinicalpilot1',pathRoot).href);
+        const script=await cache.match(new URL('./app.js?v=mvp01-sec13-20261021clinicalpilot2',pathRoot).href);
         if(start&&script){available=true;break;}
       }
       tests.push(diagnosticCheck('アプリ資産の事前保存',available?'OK':'要再起動',
@@ -1454,8 +1454,8 @@ async function renderSettings(){
   let persisted='未確認'; try{if(navigator.storage?.persisted)persisted=(await navigator.storage.persisted())?'保持を要求済み':'通常保存'}catch(e){}
   const last=state.settings.lastBackupAt?new Date(state.settings.lastBackupAt).toLocaleString('ja-JP'):'まだありません';
   $('#main').innerHTML=`<div class="hero"><div><h1>設定</h1><p>移行・バックアップ・容量・セキュリティを管理します。</p></div></div>
-  <div class="panel"><h3>データ移行</h3><p class="notice">住所・電話番号・連絡先の列はCSVに含まれていても保存しません。氏名・病名・病院ID・FileMaker番号は取り込みます。写真や自由記述の内容は対象外です。</p><div class="settings-row"><div><b>患者CSVを読み込む</b><small>FileMakerの「番号」（必須）で患者を照合。病院の「ＩＤ」は別項目として保持し、タスク・記録・写真も残します。ICU3-10以降は未配置扱い。追加・更新は既存の記録を保持します。必要なときだけ手動でバックアップできます。</small></div><button class="btn secondary" id="impP">読込</button></div><div class="settings-row"><div><b>薬剤CSVを読み込む</b><small>医薬品分類・薬価・薬効・薬名の4列。</small></div><button class="btn secondary" id="impD">読込</button></div></div>
-  <div class="panel"><h3>全件入れ替え（危険：現在の記録を全消去）</h3><div class="settings-row"><div><b>患者CSVで全件入れ替え（記録も消去）</b><small>患者データ・タスク・経過記録・写真をすべて置換します。薬剤・マスター・設定は保持します。患者ID（番号）必須。実行前に件数を確認します。</small></div><button class="btn danger" id="replaceP">全件入れ替え</button></div></div>
+  <div class="panel"><h3>データ移行</h3><p class="notice">住所・電話番号・連絡先の列はCSVに含まれていても保存しません。氏名・病名・病院ID・FileMaker番号は取り込みます。写真や自由記述の内容は対象外です。</p><div class="settings-row"><div><b>患者CSVを読み込む</b><small>病院の「ＩＤ」で患者を照合。「番号」は全員同じでも問題ありません。タスク・記録・写真も残します。ICU3-10以降は未配置扱い。追加・更新は既存の記録を保持します。必要なときだけ手動でバックアップできます。</small></div><button class="btn secondary" id="impP">読込</button></div><div class="settings-row"><div><b>薬剤CSVを読み込む</b><small>医薬品分類・薬価・薬効・薬名の4列。</small></div><button class="btn secondary" id="impD">読込</button></div></div>
+  <div class="panel"><h3>全件入れ替え（危険：現在の記録を全消去）</h3><div class="settings-row"><div><b>患者CSVで全件入れ替え（記録も消去）</b><small>患者データ・タスク・経過記録・写真をすべて置換します。薬剤・マスター・設定は保持します。実務試用版では安全のため全件入れ替えを停止しています。</small></div><button class="btn danger" id="replaceP">全件入れ替え</button></div></div>
   <div class="panel"><h3>退院患者の保存</h3><p class="notice">Ver.1.0.17から退院患者の自動削除を停止しました。退院確定後も記録を保存し、患者画面の「退院患者記録」から検索・閲覧・確定取消できます。</p><div class="settings-row"><b>保存中の退院患者</b><span>${state.patients.filter(p=>p.dischargeDate).length}名</span></div></div>
   <div class="panel"><h3>セキュリティ</h3><div class="settings-row"><div><b>自動ロック</b><small>無操作時に暗証画面へ戻ります。</small></div><select id="autolock"><option value="1">1分</option><option value="5">5分</option><option value="10">10分</option><option value="30">30分</option></select></div><div class="settings-row"><div><b>暗証を変更</b><small>現在の暗証を確認後、新しい暗証でDBを再暗号化します。</small></div><button class="btn secondary" id="changePin">変更</button></div></div>
   <div class="panel"><h3>必要時のみ：手動バックアップ</h3><p class="notice">定期バックアップは必須にしません。患者情報を長期間保管する目的ではなく、端末故障時に残したい未完了タスクや記録がある場合、端末変更や全件入替の前など必要な場面で利用します。保存したファイルの管理・削除にも注意してください。</p><div class="settings-row"><div><b>暗号化バックアップ</b><small>患者・薬剤・経過記録・マスターを暗号化したまま書き出します。<br>保存確認済み：${esc(last)}</small></div><button class="btn secondary" id="backup">書出</button></div><div class="settings-row"><div><b>ファイルへの保存確認</b><small>「ファイル」アプリに .mswdb があることを実際に確認してから押してください。復元成功の証明ではありません。</small></div><button class="btn secondary" id="backupVerified">保存確認済み</button></div><div class="settings-row"><div><b>バックアップ復元</b><small>.mswdb ファイルを読み込みます。</small></div><button class="btn secondary" id="restore">復元</button></div></div>
@@ -1626,12 +1626,12 @@ function assertUniqueActiveHospitalIds(patients){
     seen.set(hospitalId,fileMakerId);
   }
 }
-// Safe CSV add/update: FileMaker's 番号 is authoritative; keep MSW-only tasks,
-// notes, attachments and existing records unchanged unless the CSV has that field.
+// CSV patient identity is hospital ID (ＩＤ). FileMaker 番号 may be 1 for all rows.
+// Keep 番号 only as an optional original field; never use it as a matching key.
 function prepareFileMakerMerge(csvText,currentPatients=state.patients){
   const {headers,rows:rowsIn}=readPatientCsvRows(csvText);
-  const idCol='番号';
-  if(!headers.includes('番号')||!headers.includes('氏名')||!headers.includes('ベッド番号'))throw new Error('必要な列（FileMakerの「番号」・氏名・ベッド番号）がありません。');
+  const idCol='ＩＤ';
+  if(!(headers.includes('ＩＤ')||headers.includes('ID'))||!headers.includes('氏名')||!headers.includes('ベッド番号'))throw new Error('必要な列（病院の「ＩＤ」または「ID」・氏名・ベッド番号）がありません。');
   if(!rowsIn.length)throw new Error('患者データがありません。');
   const patients=currentPatients.map(p=>({...p,data:{...p.data}}));
   const seen=new Set();let added=0,updated=0,normalized=0,unplaced=0;
@@ -1640,7 +1640,7 @@ function prepareFileMakerMerge(csvText,currentPatients=state.patients){
     if(!id||!name)throw new Error(`${i+2}行目：患者IDまたは氏名が空欄です。`);
     if(seen.has(id))throw new Error(`${i+2}行目：CSV内に患者IDが重複しています。`);
     seen.add(id);
-    const matching=patients.filter(p=>String(p.data?.['番号']??'').trim()===id);
+    const matching=patients.filter(p=>String(p.data?.['ＩＤ']||p.data?.['ID']||'').trim()===id);
     if(matching.length>1)throw new Error(`${i+2}行目：既存患者に同じIDが複数あります。取り込みを中止しました。`);
     let p=matching[0];
     if(p?.dischargeDate)throw new Error(`${i+2}行目：退院済みの同一IDが存在します。再入院か確認してください。`);
@@ -1649,25 +1649,22 @@ function prepareFileMakerMerge(csvText,currentPatients=state.patients){
       const csvHospitalId=String(o['ＩＤ']||o['ID']||'').trim();
       const sameHospitalId=Boolean(oldHospitalId&&csvHospitalId&&oldHospitalId===csvHospitalId);
       if(oldHospitalId&&csvHospitalId&&!sameHospitalId)
-        throw new Error(`${i+2}行目：FileMaker番号「${id}」の病院IDが既存患者と違います。手動照合してください。`);
+        throw new Error(`${i+2}行目：病院IDの病院IDが既存患者と違います。手動照合してください。`);
       const normalName=v=>String(v??'').replace(/[\s\u3000]/g,'');
-      if(normalName(p.data?.['氏名'])&&normalName(p.data?.['氏名'])!==normalName(name)&&!sameHospitalId)
-        throw new Error(`${i+2}行目：FileMaker番号「${id}」の氏名が既存患者と異なります。自動上書きせず手動照合してください。`);
+      if(normalName(p.data?.['氏名'])&&normalName(p.data?.['氏名'])!==normalName(name))
+        throw new Error(`${i+2}行目：病院IDの氏名が既存患者と異なります。自動上書きせず手動照合してください。`);
       const oldAdmission=String(p.data?.['入院日']??'').trim();
       const csvAdmission=String(o['入院日']??'').trim();
       const day=v=>String(v).replace(/\//g,'-').replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/,(_m,y,m,d)=>`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
       if(oldAdmission&&csvAdmission&&day(oldAdmission)!==day(csvAdmission))
-        throw new Error(`${i+2}行目：FileMaker番号「${id}」の入院日が異なります。再入院か確認してください。`);
+        throw new Error(`${i+2}行目：病院IDの入院日が異なります。再入院か確認してください。`);
     }
     // A legacy patient without FileMaker 番号 must never be matched automatically
     // using hospital ＩＤ or name: that would risk linking a different admission.
     if(!p){
       const norm=v=>String(v??'').replace(/\s/g,'');
-      const legacyCandidate=patients.some(x=>!x.dischargeDate&&!String(x.data?.['番号']??'').trim()&&(
-        (o['ＩＤ']&&String(x.data?.['ＩＤ']??'').trim()===String(o['ＩＤ']).trim())||
-        String(x.data?.['ＩＤ']??'').trim()===id||norm(x.data?.['氏名'])===norm(name)
-      ));
-      if(legacyCandidate)throw new Error(`${i+2}行目：FileMaker番号が未設定の既存患者と同一の可能性があります。手動照合が必要です。`);
+      const legacyCandidate=patients.some(x=>!x.dischargeDate&&!String(x.data?.['ＩＤ']||x.data?.['ID']||'').trim()&&norm(x.data?.['氏名'])===norm(name));
+      if(legacyCandidate)throw new Error(`${i+2}行目：病院IDが未設定の同姓同名患者がいます。手動照合してください。`);
     }
     if(!p){
       const sameNameWithoutId=patients.some(x=>!x.dischargeDate&&String(x.data?.['氏名']??'').replace(/\s/g,'')===name.replace(/\s/g,'')&&![x.data?.['番号'],x.data?.['ＩＤ']].some(v=>String(v??'').trim()));
@@ -1675,7 +1672,7 @@ function prepareFileMakerMerge(csvText,currentPatients=state.patients){
       p=newPatient();delete p._new;patients.push(p);added++;
     }else updated++;
     for(const field of legacyFields){if(!isProhibitedContactField(field)&&Object.prototype.hasOwnProperty.call(o,field))p.data[field]=field==='ベッド番号'?fileMakerBed(o[field]):String(o[field]??'').trim()}
-    p.data['番号']=id; // 'ＩＤ' is the separate hospital ID, not the FileMaker record number.
+    // The CSV 番号, when provided, is copied above. Never overwrite it with hospital ID.
     if(String(o['ベッド番号']??'').trim()!==p.data['ベッド番号'])normalized++;
     if(p.data['ベッド番号']&&!isMappedBed(p.data['ベッド番号']))unplaced++;
     p.updatedAt=nowISO();
@@ -1707,7 +1704,7 @@ async function importPatients(file){
     const {text,encoding}=await readFileMakerCsv(file);
     const result=prepareFileMakerMerge(text);
     const {patients,added,updated,normalized,unplaced,skippedContactColumns}=result;
-    if(!confirm(`FileMakerのCSVを追加・更新します。\n新規：${added}人／既存更新：${updated}人\nベッド表記の正規化：${normalized}人／その他・未配置：${unplaced}人
+    if(!confirm(`FileMakerのCSVを病院ID（ＩＤ）で照合し、追加・更新します。\n新規：${added}人／既存更新：${updated}人\nベッド表記の正規化：${normalized}人／その他・未配置：${unplaced}人
 文字コード：${encoding}\n住所・電話・連絡先の除外列：${skippedContactColumns}列\n\n既存の退院支援タスク・経過記録・写真を保持します。\n更新されない患者は残ります。CSV処理は上書きのため、復元したい独自記録がある場合は事前に手動バックアップを検討してください。\n\n続行しますか？`))return;
     const next={...state,patients,version:APP_VERSION,updatedAt:nowISO()};
     ensureStateSchema(next);
@@ -1721,29 +1718,7 @@ async function importPatients(file){
 // Ver.1.0.7: explicitly requested full replacement of TEST patient records only.
 // The original merge import remains available separately and unchanged.
 function prepareFileMakerReplacement(csvText){
-  const {headers,rows:raw}=readPatientCsvRows(csvText);
-  const idCol='番号';
-  if(!headers.includes('番号')||!headers.includes('氏名')||!headers.includes('ベッド番号'))throw new Error('必要な列（FileMakerの「番号」・氏名・ベッド番号）がありません。');
-  if(!raw.length)throw new Error('患者データがありません。');
-  const seen=new Set(), errors=[], patients=[], changed=[];
-  for(let i=0;i<raw.length;i++){
-    const o=raw[i],id=String(o[idCol]??'').trim(),name=String(o['氏名']??'').trim();
-    if(!id){errors.push(`${i+2}行目：患者IDが空欄`);continue;}
-    if(!name){errors.push(`${i+2}行目：氏名が空欄`);continue;}
-    if(seen.has(id)){errors.push(`${i+2}行目：患者IDの重複`);continue;}
-    seen.add(id);
-    const p=newPatient();delete p._new;
-    for(const k of legacyFields)if(!isProhibitedContactField(k)&&o[k]!==undefined)p.data[k]=String(o[k]??'').trim();
-    p.data['番号']=id; // 'ＩＤ' is kept from FileMaker if provided.
-    const oldBed=String(o['ベッド番号']??'').trim(),newBed=fileMakerBed(oldBed);
-    p.data['ベッド番号']=newBed;
-    if(oldBed!==newBed)changed.push({oldBed,newBed});
-    patients.push(p);
-  }
-  if(errors.length)throw new Error(`CSVを取り込めません。\n${errors.slice(0,8).join('\n')}${errors.length>8?'\nほかにもエラーがあります':''}`);
-  assertUniqueActiveHospitalIds(patients);
-  const invalid=patients.filter(p=>p.data['ベッド番号']&&!isMappedBed(p.data['ベッド番号']));
-  return {patients,changed,invalid,skippedContactColumns:headers.filter(isProhibitedContactField).length};
+  throw new Error('実務試用版では全件入れ替えを一時停止しています。通常の「患者CSVを読み込む」を使用してください。');
 }
 async function replacePatientsFromFileMaker(file){
   if(patientCsvBusy){alert('患者CSVの取り込み処理中です。完了後に再試行してください。');return}
