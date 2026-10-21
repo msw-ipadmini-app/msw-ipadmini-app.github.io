@@ -3,7 +3,7 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BEDAUDIT1';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BEDBASE1';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -1402,7 +1402,7 @@ async function collectEnvironmentDiagnostics(){
       for(const name of names){
         const cache=await caches.open(name);
         const start=await cache.match(new URL('./index.html',pathRoot).href);
-        const script=await cache.match(new URL('./app.js?v=mvp01-sec13-20261021clinicalpilot5',pathRoot).href);
+        const script=await cache.match(new URL('./app.js?v=mvp01-sec13-20261021clinicalpilot6',pathRoot).href);
         if(start&&script){available=true;break;}
       }
       tests.push(diagnosticCheck('アプリ資産の事前保存',available?'OK':'要再起動',
@@ -1454,7 +1454,7 @@ async function renderSettings(){
   let persisted='未確認'; try{if(navigator.storage?.persisted)persisted=(await navigator.storage.persisted())?'保持を要求済み':'通常保存'}catch(e){}
   const last=state.settings.lastBackupAt?new Date(state.settings.lastBackupAt).toLocaleString('ja-JP'):'まだありません';
   $('#main').innerHTML=`<div class="hero"><div><h1>設定</h1><p>移行・バックアップ・容量・セキュリティを管理します。</p></div></div>
-  <div class="panel"><h3>データ移行</h3><p class="notice">住所・電話番号・連絡先の列はCSVに含まれていても保存しません。氏名・病名・病院ID・FileMaker番号は取り込みます。写真や自由記述の内容は対象外です。</p><div class="settings-row"><div><b>患者CSVを読み込む</b><small>病院の「ＩＤ」で患者を照合。「番号」は全員同じでも問題ありません。タスク・記録・写真も残します。ICU3-10以降は未配置扱い。追加・更新は既存の記録を保持します。必要なときだけ手動でバックアップできます。</small></div><button class="btn secondary" id="impP">読込</button></div><div class="settings-row"><div><b>ベッド照合（保存なし）</b><small>同じCSVを選び、MVP01の現在のベッド番号と比較します。患者氏名・IDの表示・外部送信・保存・更新は行いません。人数と差異の例だけ確認できます。</small></div><button class="btn secondary" id="auditP" type="button">照合</button></div><pre id="bedAuditResult" class="notice" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status" aria-live="polite"></pre><div class="settings-row"><div><b>薬剤CSVを読み込む</b><small>医薬品分類・薬価・薬効・薬名の4列。</small></div><button class="btn secondary" id="impD">読込</button></div></div>
+  <div class="panel"><h3>データ移行</h3><p class="notice">住所・電話番号・連絡先の列はCSVに含まれていても保存しません。氏名・病名・病院ID・FileMaker番号は取り込みます。写真や自由記述の内容は対象外です。</p><div class="settings-row"><div><b>患者CSVを読み込む</b><small>病院の「ＩＤ」で患者を照合。「番号」は全員同じでも問題ありません。タスク・記録・写真も残します。ICU3-10以降は未配置扱い。追加・更新は既存の記録を保持します。必要なときだけ手動でバックアップできます。</small></div><button class="btn secondary" id="impP">読込</button></div><div class="settings-row"><div><b>ベッド照合（保存なし）</b><small>同じCSVを選び、MVP01の現在のベッド番号と比較します。患者氏名・IDの表示・外部送信・保存・更新は行いません。人数と差異の例だけ確認できます。</small></div><button class="btn secondary" id="auditP" type="button">照合</button></div><pre id="bedAuditResult" class="notice" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status" aria-live="polite"></pre><div class="settings-row"><div><b>初回49人のベッド照合基準を確定</b><small>上の照合で一致43人・不一致6人を確認し、MVP01の現在の49人全員の配置が正しいと確定した場合だけ使います。選択したCSVの古いベッド位置を比較用として暗号化記録します。患者のベッドや情報は変更しません。再登録はできません。</small></div><button class="btn secondary" id="confirmBedBaseline" type="button">基準を登録</button></div><pre id="bedBaselineResult" class="notice" style="white-space:pre-wrap;overflow-wrap:anywhere" role="status" aria-live="polite"></pre><div class="settings-row"><div><b>薬剤CSVを読み込む</b><small>医薬品分類・薬価・薬効・薬名の4列。</small></div><button class="btn secondary" id="impD">読込</button></div></div>
   <div class="panel"><h3>全件入れ替え（危険：現在の記録を全消去）</h3><div class="settings-row"><div><b>患者CSVで全件入れ替え（記録も消去）</b><small>患者データ・タスク・経過記録・写真をすべて置換します。薬剤・マスター・設定は保持します。実務試用版では安全のため全件入れ替えを停止しています。</small></div><button class="btn danger" id="replaceP">全件入れ替え</button></div></div>
   <div class="panel"><h3>退院患者の保存</h3><p class="notice">Ver.1.0.17から退院患者の自動削除を停止しました。退院確定後も記録を保存し、患者画面の「退院患者記録」から検索・閲覧・確定取消できます。</p><div class="settings-row"><b>保存中の退院患者</b><span>${state.patients.filter(p=>p.dischargeDate).length}名</span></div></div>
   <div class="panel"><h3>セキュリティ</h3><div class="settings-row"><div><b>自動ロック</b><small>無操作時に暗証画面へ戻ります。</small></div><select id="autolock"><option value="1">1分</option><option value="5">5分</option><option value="10">10分</option><option value="30">30分</option></select></div><div class="settings-row"><div><b>暗証を変更</b><small>現在の暗証を確認後、新しい暗証でDBを再暗号化します。</small></div><button class="btn secondary" id="changePin">変更</button></div></div>
@@ -1467,7 +1467,7 @@ async function renderSettings(){
   $('#autolock').value=String(state.settings.autoLockMin??5);
   $('#autolock').onchange=async e=>{state.settings.autoLockMin=+e.target.value;await save();resetAutoLock()};
   $('#replaceP').onclick=()=>pickFile('.csv',replacePatientsFromFileMaker);
-  $('#impP').onclick=()=>pickFile('.csv',importPatients);$('#auditP').onclick=()=>pickFile('.csv',auditPatientBedCsvFile);$('#impD').onclick=()=>pickFile('.csv',importDrugs);
+  $('#impP').onclick=()=>pickFile('.csv',importPatients);$('#auditP').onclick=()=>pickFile('.csv',auditPatientBedCsvFile);$('#confirmBedBaseline').onclick=()=>pickFile('.csv',enrollVerifiedBedBaseline);$('#impD').onclick=()=>pickFile('.csv',importDrugs);
   $('#backup').onclick=backup;$('#restore').onclick=()=>pickFile('.mswdb,application/json',restore);
   $('#backupVerified').onclick=async()=>{
     if(!confirm('iPadの「ファイル」アプリで .mswdb が存在することを直接確認しましたか？\nこれは復元試験の完了を意味しません。'))return;
@@ -1785,6 +1785,66 @@ function formatPatientBedAudit(report){
     '※これは表示のみ。患者情報やベッド位置を書き換えません。',
     '※人数だけチャッピーに伝えてください。氏名・ID・ファイルは送信不要。'
   ].join('\n');
+}
+// One-time baseline enrollment for the 49 verified active patients.
+// Compare only: do not import CSV fields or replace clinician-corrected beds.
+// The caller explicitly confirms the exact 49/43/6 audit results before any
+// encrypted metadata is saved. Subsequent attempts must not reset the baseline.
+function prepareVerifiedBedBaseline(csvText,currentPatients=state.patients){
+  const report=auditPatientBedCsvText(csvText,currentPatients);
+  if(report.csvRows!==49||report.matched!==49||report.equal!==43||report.different!==6||
+     report.csvOnly!==0||report.appOnly!==0||report.appBlank!==0||report.csvBlank!==0||
+     report.unknownBaseline!==6)
+    throw new Error('初回確認時の49人・一致43人・差異6人と照合結果が異なります。保存せず再確認してください。');
+  const {rows}=readPatientCsvRows(csvText);
+  const rowsById=new Map();
+  for(const row of rows){
+    const id=String(row['ＩＤ']||row['ID']||'').trim();
+    if(!id||rowsById.has(id))throw new Error('CSVの病院IDが空欄または重複しています。');
+    rowsById.set(id,row);
+  }
+  const confirmedAt=nowISO();
+  const patients=currentPatients.map(p=>{
+    if(p.dischargeDate)return {...p};
+    const id=String(p.data?.['ＩＤ']||p.data?.['ID']||'').trim(),row=rowsById.get(id);
+    if(!row)throw new Error('病院IDに一致するCSVの患者がいません。');
+    if(typeof p.lastFileMakerBed==='string')
+      throw new Error('比較基準がすでに登録されています。再登録で上書きしません。');
+    const normalizeName=v=>String(v??'').replace(/[\s\u3000]/g,'');
+    if(!normalizeName(p.data?.['氏名'])||normalizeName(p.data['氏名'])!==normalizeName(row['氏名']))
+      throw new Error('患者氏名がCSVと一致しません。基準登録を中止します。');
+    const day=v=>String(v).replace(/\//g,'-').replace(/^(\d{4})-(\d{1,2})-(\d{1,2})$/,(_m,y,m,d)=>`${y}-${m.padStart(2,'0')}-${d.padStart(2,'0')}`);
+    const d1=String(p.data?.['入院日']??'').trim(),d2=String(row['入院日']??'').trim();
+    if(d1&&d2&&day(d1)!==day(d2))throw new Error('入院日がCSVと一致しません。基準登録を中止します。');
+    const sourceBed=fileMakerBed(row['ベッド番号']);
+    const currentBed=normalizeBed(p.data?.['ベッド番号']);
+    if(!sourceBed||!currentBed)throw new Error('ベッド番号が空欄の患者がいます。基準登録を中止します。');
+    // Do not touch p.data, tasks, notes, photos, status, or current bed.
+    return {...p,lastFileMakerBed:sourceBed,bedBaselineVerifiedAt:confirmedAt};
+  });
+  return {patients,report};
+}
+async function enrollVerifiedBedBaseline(file){
+  const name='FileMakerベッド比較基準の確定';
+  const resultEl=$('#bedBaselineResult');
+  if(!resultEl)return;
+  if(patientCsvBusy){resultEl.textContent='CSV管理処理中です。完了後に再試行してください。';return;}
+  patientCsvBusy=true;
+  try{
+    await preflightPatientImport({reserved:true});
+    await beginMaintenance(name,{allowCsv:true});
+    const {text}=await readFileMakerCsv(file);
+    const {patients,report}=prepareVerifiedBedBaseline(text);
+    const yes=confirm('【初回49人のベッド位置を基準登録】\nCSV：49人／病院ID一致：49人\nベッド一致：43人／不一致：6人\n\n現在MVP01にある49人のベッド配置が全員正しいことを確認済みですか？\n\n「OK」でCSV側の古いベッド番号だけを比較用として暗号化保存します。患者のベッド位置・氏名・記録・写真は変更しません。\nこの基準は2回目以降の自動上書きができません。');
+    if(!yes){resultEl.textContent='基準登録をキャンセルしました。患者情報は変更していません。';return;}
+    const next={...state,patients,updatedAt:nowISO()};
+    await orderedDataWrite(async()=>idbSet('data',await encryptPatientIndex(next,key)));
+    state=next;
+    resultEl.textContent='比較基準の登録完了：49人（ベッド一致43人・手動配置差異6人）。現在の患者のベッド位置や記録は変更していません。';
+    $('#confirmBedBaseline').disabled=true;
+    alert('比較基準を暗号化保存しました。\n49人の現在のベッド配置は保持されています。\n次回のCSV取り込み時は、この基準と照合します。');
+  }catch(e){resultEl.textContent='基準登録は中止されました：'+(e.message||'処理に失敗しました。')}
+  finally{endMaintenance(name);patientCsvBusy=false;}
 }
 async function auditPatientBedCsvFile(file){
   const status=$('#bedAuditResult');
