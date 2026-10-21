@@ -1,7 +1,7 @@
 <!doctype html><html lang="ja"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0f766e">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-QJzsryZRpGp3wuCCVkBLRT2VbmEBasXlQtcBxE1O6/M='; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-H/EpDm84vD5N/xIZe7rU+aecRWG2s9CUs32gB4vXQkg='; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; worker-src 'none'">
 <title>MSW MVP01 RC3M 架空患者のみ・単体実機プレビュー</title>
 <style>:root{--bg:#f4f7f7;--card:#fff;--ink:#173033;--muted:#687b7d;--line:#d9e4e4;--brand:#0f766e;--brand2:#14b8a6;--warn:#c2410c;--danger:#b91c1c;--shadow:0 6px 24px rgba(15,60,60,.08)}
 *{box-sizing:border-box}html,body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif}body{min-height:100vh}
@@ -436,7 +436,7 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_rc3m_standalone_fake_20261020', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PREVIEW';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PREVIEW-PIN6-FAKE';
 // NOTE: THIS BUNDLE IS FICTIONAL-DATA ONLY. An operator-provided host-specific
 // release must be built after authorization. Code cannot verify medical consent.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -699,11 +699,11 @@ async function init(){
     return;
   }
   await openDB();meta=await idbGet('meta');/* standalone fictional preview: no service worker registration *//* no persistent-storage permission request in preview */renderLock()}
-function renderLock(msg=''){document.getElementById('morningPrint')?.remove();const fresh=!meta;$('#app').innerHTML=`<div class="lockwrap"><div class="lockcard"><h1>MSW患者管理</h1><p style="font-weight:700">架空データ検証用 Ver.${APP_VERSION}</p><p>${fresh?'初回設定：この端末用の暗証を作成します。':'暗証を入力してロック解除してください。'}</p>${msg?`<div class="alert">${esc(msg)}</div>`:''}<input id="pin" type="password" inputmode="text" autocomplete="off" placeholder="12文字以上・文字と数字" /><button class="btn" id="unlock" style="width:100%">${fresh?'暗証を設定':'ロック解除'}</button><p class="notice">この画面は既存版と別の検証用保存領域を使います。実際の患者情報は入力しないでください。氏名・病名は登録できますが、住所・電話番号・連絡先の専用項目は保存しません。端末内で暗号化して保存します。暗証を忘れると復旧できません。端末自体のパスコード・紛失対策も必ず有効にしてください。</p></div></div>`;$('#unlock').onclick=fresh?setup:unlock;$('#pin').onkeydown=e=>{if(e.key==='Enter')$('#unlock').click()};setTimeout(()=>$('#pin').focus(),80)}
-function strongNewPin(pin){return typeof pin==='string'&&pin.length>=12&&/[0-9]/.test(pin)&&/\p{L}/u.test(pin)}
+function renderLock(msg=''){document.getElementById('morningPrint')?.remove();const fresh=!meta;$('#app').innerHTML=`<div class="lockwrap"><div class="lockcard"><h1>MSW患者管理</h1><p style="font-weight:700">架空データ検証用 Ver.${APP_VERSION}</p><p>${fresh?'初回設定：この端末用の暗証を作成します。':'暗証を入力してロック解除してください。'}</p>${msg?`<div class="alert">${esc(msg)}</div>`:''}<input id="pin" type="password" inputmode="text" autocomplete="off" placeholder="6文字以上・文字と数字" /><button class="btn" id="unlock" style="width:100%">${fresh?'暗証を設定':'ロック解除'}</button><p class="notice">この画面は既存版と別の検証用保存領域を使います。実際の患者情報は入力しないでください。氏名・病名は登録できますが、住所・電話番号・連絡先の専用項目は保存しません。端末内で暗号化して保存します。暗証を忘れると復旧できません。6文字の暗証は架空データ検証専用であり、実患者情報の保護には使用しないでください。端末自体のパスコード・紛失対策も必ず有効にしてください。</p></div></div>`;$('#unlock').onclick=fresh?setup:unlock;$('#pin').onkeydown=e=>{if(e.key==='Enter')$('#unlock').click()};setTimeout(()=>$('#pin').focus(),80)}
+function strongNewPin(pin){return typeof pin==='string'&&pin.length>=6&&/[0-9]/.test(pin)&&/\p{L}/u.test(pin)}
 async function setup(){
   const pin=$('#pin').value;
-  if(!strongNewPin(pin))return renderLock('暗証は12文字以上で、数字と文字を組み合わせてください。');
+  if(!strongNewPin(pin))return renderLock('暗証は6文字以上で、数字と文字を組み合わせてください。');
   try{
     // Missing authentication metadata must never silently orphan old encrypted photos.
     // Reject *any* pre-existing record before generating new authentication keys.
@@ -1930,7 +1930,7 @@ async function changePin(){
     await beginMaintenance(action);
   const oldPin=prompt('現在の暗証を入力してください'); if(oldPin===null)return;
   try{const oldKey=await derive(oldPin,unb64(meta.salt));await decryptObj(meta.check,oldKey)}catch(e){return alert('現在の暗証が違います。')}
-  const np=prompt('新しい暗証（12文字以上、数字だけでなく文字も使用）を入力してください');if(np===null)return;if(!strongNewPin(np))return alert('新しい暗証は12文字以上で、数字と文字を組み合わせてください。');
+  const np=prompt('新しい暗証（6文字以上、数字だけでなく文字も使用）を入力してください');if(np===null)return;if(!strongNewPin(np))return alert('新しい暗証は6文字以上で、数字と文字を組み合わせてください。');
   const np2=prompt('確認のため新しい暗証をもう一度入力してください');if(np!==np2)return alert('新しい暗証が一致しません。');
   const salt=crypto.getRandomValues(new Uint8Array(16));const newKey=await derive(np,salt);const newMeta={version:1,salt:b64(salt),check:await encryptObj({ok:true},newKey),createdAt:meta.createdAt||nowISO(),changedAt:nowISO()};
   // Re-encrypt every referenced photo together with the patient state and PIN metadata.
