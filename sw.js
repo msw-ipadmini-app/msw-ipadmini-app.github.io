@@ -4,12 +4,12 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261021clinicalcandidate';
+const CACHE=CACHE_PREFIX+'20261021clinicalpilot1';
 const ASSETS=[
   './', './index.html',
-  './pwa-updater.js?v=mvp01-sec13-20261021clinicalcandidate',
-  './styles.css?v=mvp01-sec13-20261021clinicalcandidate',
-  './app.js?v=mvp01-sec13-20261021clinicalcandidate',
+  './pwa-updater.js?v=mvp01-sec13-20261021clinicalpilot1',
+  './styles.css?v=mvp01-sec13-20261021clinicalpilot1',
+  './app.js?v=mvp01-sec13-20261021clinicalpilot1',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
