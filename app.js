@@ -3,7 +3,8 @@ const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BEDCOLOR1';
+let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST1';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -67,10 +68,11 @@ function removeProhibitedContactFieldsFromState(candidate){
   }
   return {removed,nonempty};
 }
-const DATA_MINIMIZATION_NOTICE='住所・電話番号・連絡先は登録しません。自由記述や写真に含まれる情報は自動除去できないため、入力・撮影前に確認してください。';
+const DATA_MINIMIZATION_NOTICE='住所は市町村名のみ。番地・電話番号・連絡先は登録しません。自由記述や写真に含まれる情報は自動除去できません。';
 
-const masterFields=['ベッド番号','主治医','病名','保険','本人職業','術式','入院元','かかりつけ','家構','KP職業','介護度','入院時介護度','介護連携','ケアマネ・施設','検討会','退院支援','食事','食事：介助量','水分：トロミ','排泄','排泄：介助量','排泄：尿便意','排泄：利用','移乗','移動器具','睡眠','睡眠：薬剤','高次脳','問題行動','スケール','リハ状況','DM注','コール'];
+const masterFields=['ベッド番号','市町村','主治医','病名','保険','本人職業','術式','入院元','かかりつけ','家構','KP職業','介護度','入院時介護度','介護連携','ケアマネ・施設','検討会','退院支援','食事','食事：介助量','水分：トロミ','排泄','排泄：介助量','排泄：尿便意','排泄：利用','移乗','移動器具','睡眠','睡眠：薬剤','高次脳','問題行動','スケール','リハ状況','DM注','コール'];
 const defaultMasters={
+  '市町村':['茨城町','水戸市','小美玉市','笠間市','鉾田市'],
   '進捗ステータス':['未設定','情報収集中','家族調整中','施設調整中','介護申請中','退院先決定','要対応'],
   '経過記録種別':['面談','家族連絡','施設連絡','院内連携','制度・申請','その他'],
   '介護度':['未申請','申請中','非該当','要支援1','要支援2','要介護1','要介護2','要介護3','要介護4','要介護5'],
@@ -405,7 +407,19 @@ function render(){resetAutoLock();const net=navigator.onLine?'通信あり':'通
 function activePatients(){return state.patients.filter(p=>!p.dischargeDate)}
 function getStatus(p){return p.status||'未設定'}
 function statusTag(s){const c=s.includes('要')?'red':s.includes('決定')?'green':s.includes('施設')?'purple':s==='未設定'?'':'orange';return `<span class="tag ${c}">${esc(s)}</span>`}
-function renderPatients(){const ps=activePatients();$('#main').innerHTML=`<div class="hero"><div><h1>入院患者</h1><p>在院患者を管理します。退院確定後の患者は「退院患者記録」から確認できます。</p></div><div class="spacer"></div><button class="btn secondary" id="openArchive">退院患者記録</button><button class="btn" id="newP">＋患者</button></div><div class="kpis"><div class="kpi"><b>${ps.length}</b><span>在院患者</span></div><div class="kpi"><b>${ps.filter(p=>p.tasks?.some(t=>!t.done)).length}</b><span>要対応あり</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('施設')).length}</b><span>施設調整中</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('決定')).length}</b><span>退院先決定</span></div></div><div class="toolbar"><input id="q" placeholder="氏名・病名・病床で検索"><select id="ward"><option value="">全病棟</option><option value="一般病棟">一般病棟</option><option value="ICU">ICU</option><option value="その他">その他・未配置</option></select><button class="btn secondary" id="print">朝一患者一覧を印刷</button></div><div id="patientList"></div>`;$('#openArchive').onclick=()=>{screen='archive';render()};$('#newP').onclick=()=>openPatient(newPatient());$('#print').onclick=printMorningList;$('#q').oninput=drawPatientList;$('#ward').onchange=drawPatientList;drawPatientList()}
+function sanThereseTargets(){return activePatients().filter(p=>p.sanThereseMeeting===true)}
+function renderPatients(){
+  const ps=activePatients(),targets=sanThereseTargets();
+  $('#main').innerHTML=`<div class="hero"><div><h1>入院患者</h1><p>在院患者を管理します。退院確定後の患者は「退院患者記録」から確認できます。</p></div><div class="spacer"></div><button class="btn secondary" id="openArchive">退院患者記録</button><button class="btn" id="newP">＋患者</button></div><div class="kpis"><div class="kpi"><b>${ps.length}</b><span>在院患者</span></div><div class="kpi"><b>${ps.filter(p=>p.tasks?.some(t=>!t.done)).length}</b><span>要対応あり</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('施設')).length}</b><span>施設調整中</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('決定')).length}</b><span>退院先決定</span></div></div><div class="santherese-nav" role="group" aria-label="患者一覧の切り替え"><button type="button" class="btn secondary ${sanThereseOnly?'':'is-selected'}" id="showAllPatients" aria-pressed="${!sanThereseOnly}">🏥 全患者のベッドマップ</button><button type="button" class="btn secondary santherese-filter ${sanThereseOnly?'is-selected':''}" id="showSanTherese" aria-pressed="${sanThereseOnly}">🟠 サン・テレーズ検討会 ${targets.length}人</button></div><div class="toolbar"><input id="q" placeholder="氏名・病名・病床で検索" aria-label="患者検索"><select id="ward"><option value="">全病棟</option><option value="一般病棟">一般病棟</option><option value="ICU">ICU</option><option value="その他">その他・未配置</option></select><button class="btn secondary" id="print">朝一患者一覧を印刷</button></div><div id="patientList"></div>`;
+  $('#openArchive').onclick=()=>{screen='archive';render()};
+  $('#newP').onclick=()=>openPatient(newPatient());
+  $('#print').onclick=printMorningList;
+  $('#q').oninput=drawPatientList;
+  $('#ward').onchange=drawPatientList;
+  $('#showAllPatients').onclick=()=>{sanThereseOnly=false;renderPatients()};
+  $('#showSanTherese').onclick=()=>{sanThereseOnly=true;renderPatients()};
+  drawPatientList();
+}
 function printText(v,max=0){const a=Array.from(String(v??'').trim());return esc(max?a.slice(0,max).join(''):a.join(''))}
 function shortCareLevel(v){const s=String(v||'').trim();return s.replace('要介護','要').replace('要支援','支')}
 function printPatientForBed(bed,patients){return patientsForBed(bed,patients)[0]||null}
@@ -451,7 +465,12 @@ function printMorningList(){
   // remains intact during AirPrint's printer-selection re-pagination.
   setTimeout(()=>window.print(),50);
 }
-function drawPatientList(){const q=($('#q')?.value||'').trim().toLowerCase(),w=$('#ward')?.value||'',all=activePatients();const filtered=all.filter(p=>patientMatches(p,q)&&(!w||wardForBed(p.data['ベッド番号'])===w));const root=$('#patientList');if(q&&!filtered.length){root.innerHTML='<div class="empty">該当する患者がいません</div>';return}
+function drawPatientList(){const q=($('#q')?.value||'').trim().toLowerCase(),w=$('#ward')?.value||'',all=activePatients();const filtered=all.filter(p=>patientMatches(p,q)&&(!w||wardForBed(p.data['ベッド番号'])===w));const root=$('#patientList');if(sanThereseOnly){
+    const ps=filtered.filter(p=>p.sanThereseMeeting===true).sort((a,b)=>normalizeBed(a.data['ベッド番号']).localeCompare(normalizeBed(b.data['ベッド番号']),'ja',{numeric:true}));
+    root.innerHTML=`<section class="santherese-list"><h2>サン・テレーズ検討会 対象者一覧 <span class="count">${ps.length}人</span></h2>${ps.length?`<div class="santherese-target-grid">${ps.map(p=>`<button type="button" class="santherese-target-card" data-id="${esc(p.id)}"><span class="target-small">サン・テレーズ検討会</span><strong>${esc(p.data['氏名']||'氏名未入力')}</strong><span class="target-small">ベッド：${esc(p.data['ベッド番号']||'未配置')} ／ 主治医：${esc(p.data['主治医']||'—')}</span></button>`).join('')}</div>`:'<div class="empty">対象者はいません。患者の「基本」タブで検討会にチェックを入れてください。</div>'}</section>`;
+    root.querySelectorAll('.santherese-target-card').forEach(el=>el.onclick=()=>{const p=state.patients.find(p=>p.id===el.dataset.id);if(p)openPatient(p)});
+    return;
+  }if(q&&!filtered.length){root.innerHTML='<div class="empty">該当する患者がいません</div>';return}
   const general=layoutBedNumbers(BED_LAYOUT,all),icu=layoutBedNumbers(ICU_LAYOUT,all);let html='';
   if(!w||w==='一般病棟'){html+=`<section class="map-section"><div class="map-section-title"><div><strong>一般病棟</strong><span>病室・ベッドマップ</span></div><span class="count">${general.reduce((n,r)=>n+r.beds.length,0)}床</span></div><div class="room-map general-room-map">${general.filter(room=>!['208','210','211','212','213'].includes(room.room)).map(room=>`<div class="room-map-item standard-room">${roomMapHtml(room,filtered,q)}</div>`).join('')}<div class="compact-room-guide">208・210・211・212・213号室</div><div class="compact-room-scroll" role="region" aria-label="208・210・211・212・213号室（横スクロール可能）" tabindex="0"><div class="compact-room-row">${general.filter(room=>['208','210','211','212','213'].includes(room.room)).map(room=>`<div class="room-map-item compact-room ${room.beds.length===2?'two-bed-room':''}">${roomMapHtml(room,filtered,q)}</div>`).join('')}</div></div></div></section>`}
   if(!w||w==='ICU'){html+=`<section class="map-section"><div class="map-section-title"><div><strong>ICU</strong><span>集中治療室</span></div><span class="count">${icu.reduce((n,r)=>n+r.beds.length,0)}床</span></div><div class="room-map icu-map">${icu.map(room=>roomMapHtml(room,filtered,q,true)).join('')}</div></section>`}
@@ -492,7 +511,7 @@ function patientBedHtml(bed,patients=[]){
   if(!patients.length)return`<button class="bed-slot empty-bed" data-new-bed="${esc(bed)}"><b>${esc(bed)}</b><span>空床</span><small>タップして登録</small></button>`;
   if(patients.length>1)return`<button class="bed-slot occupied-bed duplicate-bed" data-bed="${esc(bed)}"><div class="bed-line"><b>${esc(bed)}</b></div><strong>${patients.length}名重複あり</strong><span>タップして全員を表示</span></button>`;
   const p=patients[0],days=daysSince(p.data['入院日'])||p.data['入院日数']||'',date=shortAdmissionDate(p.data['入院日']),tasks=p.tasks?.filter(t=>!t.done).length||0;
-  return`<button class="bed-slot occupied-bed" data-id="${esc(p.id)}"><div class="bed-line"><b>${esc(bed)}</b></div><strong>${esc(p.data['氏名']||'氏名未入力')}</strong><span class="bed-meta admission-line"><span>${date?esc(date):'—'}</span><span class="doctor">${esc(String(p.data['主治医']||'').replace(/医師\s*$/,'').trim()||'—')}</span><span class="days">${days?`${esc(days)}日目`:'—'}</span></span><div class="tags">${statusTag(getStatus(p))}${tasks?`<span class="tag red">要対応 ${tasks}</span>`:''}</div></button>`;
+  return`<button class="bed-slot occupied-bed ${p.sanThereseMeeting===true?'santherese-bed':''}" data-id="${esc(p.id)}"><div class="bed-line"><b>${esc(bed)}</b></div><strong>${esc(p.data['氏名']||'氏名未入力')}</strong><span class="bed-meta admission-line"><span>${date?esc(date):'—'}</span><span class="doctor">${esc(String(p.data['主治医']||'').replace(/医師\s*$/,'').trim()||'—')}</span><span class="days">${days?`${esc(days)}日目`:'—'}</span></span>${p.sanThereseMeeting===true?'<span class="santherese-bed-mark">● 検討会</span>':''}<div class="tags">${statusTag(getStatus(p))}${tasks?`<span class="tag red">要対応 ${tasks}</span>`:''}</div></button>`;
 }
 function roomMapHtml(room,patients,q){
   return`<div class="room-block"><div class="room-title">${esc(room.room)}${room.room.startsWith('ICU')?'':'号室'}</div><div class="bed-grid">${room.beds.map(bed=>{const ps=patientsForBed(bed,patients);if(q&&!ps.length)return'';return patientBedHtml(bed,ps)}).join('')}</div></div>`;
@@ -545,6 +564,7 @@ function capturePatientForm(){
     if(v==='__add__')return; // A temporary master-registration choice is not patient data.
     if(String(p.data[f]??'')!==String(v)){p.data[f]=v;changed=true}
   });
+  const meeting=$('#sanThereseCheck');if(meeting&&Boolean(p.sanThereseMeeting) !== meeting.checked){p.sanThereseMeeting=meeting.checked;changed=true}
   const status=$('#status');if(status&&String(p.status??'')!==status.value){p.status=status.value;changed=true}
   const date=$('#dischargeDate');if(date&&(p.dischargeDate||'')!==date.value){p.dischargeDate=date.value||null;changed=true}
   if(changed){patientChangeRev++;patientSaveIndicator('未保存の変更あり','pending')}
@@ -562,7 +582,7 @@ function schedulePatientAutoSave(){
 }
 function onPatientFormEdit(e){
   const el=e.target;
-  if(!el?.matches?.('[data-field], #status, #dischargeDate'))return;
+  if(!el?.matches?.('[data-field], #status, #dischargeDate, #sanThereseCheck'))return;
   if(el.value==='__add__'||e.isComposing||patientIME)return;
   if(capturePatientForm())schedulePatientAutoSave();
 }
@@ -625,7 +645,7 @@ function newPatientHasEnteredData(p){
   if(!p)return false;
   if(Object.entries(p.data||{}).some(([field,value])=>
     !['ベッド番号','入院日数'].includes(field)&&String(value??'').trim()!==''))return true;
-  return (p.tasks||[]).length>0||(p.notes||[]).length>0||
+  return p.sanThereseMeeting===true||(p.tasks||[]).length>0||(p.notes||[]).length>0||
     (p.attachments||[]).length>0||!!p.dischargeDate||
     (!!p.status&&p.status!=='未設定');
 }
@@ -683,29 +703,53 @@ function renderPatientModal(){
 }
 function closePatient(){clearPatientAutoTimer();clearBasicPhotoPreview();dismissPhotoViewer();selectedPatient=null;$('#modal')?.remove();if(key&&state&&$('#main'))render()}
 function renderTab(){const root=$('#tabbody'),p=selectedPatient;if(activeTab==='photos'){renderPhotosTab();return;}if(activeTab==='basic'){renderBasicDashboard();return;}if(groups[activeTab]){root.innerHTML=`<div class="panel"><div class="form-grid">${groups[activeTab].map(fieldHtml).join('')}</div></div>`;bindMasterSelects(root);return}if(activeTab==='support'){root.innerHTML=`<div class="panel"><h3>退院支援</h3><div class="form-grid"><div class="field"><label>進捗ステータス</label>${masterSelectHtml('進捗ステータス',getStatus(p),'id="status"')}</div><div class="field"><label>退院日</label><input type="date" id="dischargeDate" value="${esc(p.dischargeDate||'')}"></div><div class="field span2"><label>退院支援メモ</label><textarea data-field="退院支援">${esc(p.data['退院支援']||'')}</textarea></div></div></div><div class="panel"><h3>要対応タスク</h3><div id="taskList">${taskListHtml(p)}</div><label class="mvp-task-label">対応内容<input id="newTask" maxlength="300" placeholder="例：家族に連絡、施設へ確認"></label><div class="mvp-task-options"><label>対応期限（任意）<input type="date" id="newTaskDue"></label><label class="mvp-urgent"><input type="checkbox" id="newTaskUrgent"> 優先対応</label><button class="btn" id="addTask">＋ タスク追加</button></div><p class="notice">期限を空欄にしたタスクも「要対応」一覧に残ります。</p></div><div class="panel"><button class="btn danger" id="dischargeNow">退院として登録</button><p class="notice">退院患者の情報は自動削除されず、退院患者記録に保持されます。</p></div>`;$('#addTask').onclick=addTask;$('#dischargeNow').onclick=()=>{if(!$('#dischargeDate').value)$('#dischargeDate').value=new Date().toISOString().slice(0,10);$('#status').value='退院先決定';};bindTaskChecks();bindMasterSelects(root);return}if(activeTab==='notes'){root.innerHTML=`<div class="panel"><h3>経過記録を追加</h3><p class="notice">${esc(DATA_MINIMIZATION_NOTICE)}</p><div class="form-grid"><div class="field"><label>種別</label>${masterSelectHtml('経過記録種別','面談','id="noteType"')}</div><div class="field"><label>日時</label><input id="noteAt" type="datetime-local" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}"></div><div class="field span2"><label>内容</label><textarea id="noteText" placeholder="対応内容・決定事項・次にやること"></textarea></div></div><button class="btn" id="addNote">記録追加</button><p id="noteSaveState" class="notice" role="status" aria-live="polite"></p></div><div class="panel"><h3>時系列</h3><div class="timeline">${notesHtml(p)}</div></div>`;$('#addNote').onclick=addNote;bindMasterSelects(root);return}}
-// Ver.1.0.19: compact basic information overview. Preserve each existing data key so
-// backups, morning print, and the family shorthand (家構: e.g. 2同別) continue working.
-const BASIC_FIELDS=[
-  ['ベッド番号','ベッド番号'],['氏名','氏名'],
-  ['ＩＤ','ID'],['入院日','入院日'],
-  ['入院日数','入院日数'],['主治医','主治医'],
-  ['病名','病名'],
-  ['保険','保険'],['家構','家族構成'],
-  ['介護度','介護度'],['介護情報','介護情報'],
-  ['備考','備考']
-];
-function basicFieldHtml(field,label){
+// BASIC7-ST1: the confirmed seven-row iPad mini layout; keep original field keys
+// (家構, 入院元, 介護度 etc.) so FileMaker mapping and existing records still work.
+// Municipality is a new, distinct city/town/village field. No street address is copied.
+function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
   const p=selectedPatient,v=p.data?.[field]??'';
-  const span=['病名','介護情報','備考'].includes(field)?' basic-wide':'';
   if(field==='ベッド番号')return `<div class="field basic-field"><label>ベッド番号</label><input type="hidden" data-field="ベッド番号" id="patientBedValue" value="${esc(v)}"><button type="button" class="btn secondary basic-bed-picker" id="patientBedPick">${esc(v||'その他・未配置')} ▾</button></div>`;
-  if(field==='入院日数')return `<div class="field basic-field"><label>入院日数（自動計算）</label><div id="basicAdmissionDays" class="basic-readonly" aria-live="polite">${esc(daysSince(p.data['入院日'])||p.data['入院日数']||'—')}日</div></div>`;
-  const placeholder=field==='家構'?'例：2同別':field==='介護情報'?'ケアマネ・介護サービス・連絡事項など':'';
-  const type=field==='入院日'?'date':'text';
-  const suggest=['保険','主治医','介護度'].includes(field)?` list="basicList_${field}"`:'';
-  const datalist=suggest?`<datalist id="basicList_${field}">${masterValues(field,v).map(item=>`<option value="${esc(item)}"></option>`).join('')}</datalist>`:'';
+  if(field==='入院日数')return `<div class="field basic-field"><label>入院日数（自動）</label><div id="basicAdmissionDays" class="basic-readonly" aria-live="polite">${esc(daysSince(p.data['入院日'])||p.data['入院日数']||'—')}${daysSince(p.data['入院日'])||p.data['入院日数']?'日':''}</div></div>`;
+  const placeholder=field==='家構'?'例：2同別':field==='市町村'?'例：水戸市（番地は入力しない）':field==='介護情報'?'ケアマネ・介護サービスなど':'';
   const common=`data-field="${esc(field)}" aria-label="${esc(label)}" placeholder="${esc(placeholder)}"`;
-  const control=['介護情報','備考'].includes(field)?`<textarea ${common} rows="2">${esc(v)}</textarea>`:`<input type="${type}" ${common}${suggest} value="${esc(v)}">`;
-  return `<div class="field basic-field${span}"><label>${esc(label)}</label>${control}${datalist}</div>`;
+  if(multiline)return `<div class="field basic-field"><label>${esc(label)}</label><textarea ${common} rows="${rows}">${esc(v)}</textarea></div>`;
+  const type=field==='入院日'?'date':'text';
+  const numeric=field==='ＩＤ'?' inputmode="numeric" autocomplete="off"':'';
+  const limited=field==='市町村'?' maxlength="30"':'';
+  const control=`<input type="${type}" ${common}${numeric}${limited} value="${esc(v)}">`;
+  if(!['市町村','主治医','介護度'].includes(field))return `<div class="field basic-field"><label>${esc(label)}</label>${control}</div>`;
+  return `<div class="field basic-field basic-combo" data-basic-combo="${esc(field)}"><label>${esc(label)}</label><div class="basic-combo-input">${control}<button type="button" class="basic-combo-open" data-combo-open="${esc(field)}" aria-label="${esc(label)}の候補を開く" aria-expanded="false">候補 ▾</button></div><div class="basic-combo-options" hidden><select aria-label="${esc(label)}の候補一覧" data-combo-select="${esc(field)}"></select><button type="button" class="basic-combo-choose" data-combo-choose="${esc(field)}">選択</button><button type="button" class="basic-combo-add" data-combo-add="${esc(field)}" title="入力した値を候補に追加">＋追加</button></div></div>`;
+}
+function bindBasicComboInputs(root){
+  root.querySelectorAll('[data-basic-combo]').forEach(container=>{
+    const field=container.dataset.basicCombo;
+    const input=container.querySelector('[data-field]');
+    const panel=container.querySelector('.basic-combo-options');
+    const select=container.querySelector('[data-combo-select]');
+    const open=container.querySelector('[data-combo-open]');
+    const choose=container.querySelector('[data-combo-choose]');
+    const add=container.querySelector('[data-combo-add]');
+    const refill=()=>{const values=masterValues(field,input.value);select.innerHTML=values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')};
+    open.onclick=()=>{if(panel.hidden){refill();panel.hidden=false;open.setAttribute('aria-expanded','true')}else{panel.hidden=true;open.setAttribute('aria-expanded','false')}};
+    choose.onclick=()=>{if(!select.value)return;input.value=select.value;input.dispatchEvent(new Event('input',{bubbles:true}));panel.hidden=true;open.setAttribute('aria-expanded','false')};
+    add.onclick=async()=>{
+      const value=input.value.trim();
+      if(!value){alert('候補へ追加する内容を先に入力してください。');return;}
+      if(field==='市町村'&&value.length>30){alert('市町村名だけを入力してください。');return;}
+      const prev=[...(state.masters?.[field]||[])];
+      if(prev.includes(value)){refill();select.value=value;panel.hidden=true;open.setAttribute('aria-expanded','false');return;}
+      add.disabled=true;
+      try{
+        await dataWriteTail;
+        // Copy-on-write to avoid an accidental persistent in-memory change on error.
+        state.masters[field]=uniq([...prev,value]);
+        await save();
+        refill();select.value=value;
+        panel.hidden=true;open.setAttribute('aria-expanded','false');
+      }catch(e){state.masters[field]=prev;alert('候補の保存に失敗しました：'+(e.message||e))}
+      finally{add.disabled=false}
+    };
+  });
 }
 function basicDocumentHtml(){
   const gen=photoList(selectedPatient,'genogram');
@@ -725,26 +769,38 @@ function basicDocumentHtml(){
         <span aria-hidden="true">›</span>
       </button>
     </section>
+    <section class="basic-santherese" aria-label="サン・テレーズ検討会の登録">
+      <label for="sanThereseCheck"><input type="checkbox" id="sanThereseCheck" ${selectedPatient.sanThereseMeeting===true?'checked':''}><span>サン・テレーズ検討会</span></label>
+      <p class="basic-santherese-note">チェックON → 患者一覧でオレンジ色・検討会対象者一覧に表示。OFF → 通常の青色に戻ります。</p>
+    </section>
   </aside>`;
 }
 function renderBasicDashboard(){
   const root=$('#tabbody');
-  // Two zones keep the important patient data readable without vertical scrolling
-  // on the iPad mini where space allows. Very narrow screens scroll as a fallback.
   root.innerHTML=`<div class="basic-dashboard">
     <section class="basic-information" aria-label="患者基本情報">
-      <p class="notice privacy-notice">${esc(DATA_MINIMIZATION_NOTICE)}</p><div class="basic-form-grid">${BASIC_FIELDS.map(([field,label])=>basicFieldHtml(field,label)).join('')}</div>
-      <details class="basic-extra"><summary>その他の既存項目（本人職業・術式・入院元・かかりつけ）</summary>
-        <div class="basic-extra-grid">${['本人職業','術式','入院元','かかりつけ'].map(fieldHtml).join('')}</div>
+      <div class="basic-form-rows">
+        <div class="basic-row basic-r1">${basicFieldHtml('ベッド番号','ベッド番号')}${basicFieldHtml('入院日','入院日')}${basicFieldHtml('入院日数','入院日数')}</div>
+        <div class="basic-row basic-r2">${basicFieldHtml('ＩＤ','ID')}${basicFieldHtml('氏名','氏名')}${basicFieldHtml('市町村','住所（市町村のみ）')}${basicFieldHtml('家構','家族構成')}</div>
+        <div class="basic-row basic-r3">${basicFieldHtml('主治医','主治医')}${basicFieldHtml('病名','病名')}</div>
+        <div class="basic-row basic-r4">${basicFieldHtml('介護度','介護度')}</div>
+        <div class="basic-row basic-r5">${basicFieldHtml('介護情報','介護情報（広め）',{multiline:true,rows:2})}</div>
+        <div class="basic-row basic-r6">${basicFieldHtml('入院元','入院元')}</div>
+        <div class="basic-row basic-r7">${basicFieldHtml('備考','備考',{multiline:true,rows:2})}</div>
+      </div>
+      <details class="basic-extra"><summary>その他の既存項目（保険・本人職業・術式・かかりつけ）</summary>
+        <div class="basic-extra-grid">${['保険','本人職業','術式','かかりつけ'].map(fieldHtml).join('')}</div>
       </details>
+      <p class="basic-private-hint">※住所は市町村名のみ入力してください。番地や電話番号は登録しないでください。</p>
     </section>
     ${basicDocumentHtml()}
   </div>`;
   bindPatientBedPicker();
-  bindMasterSelects(root); // Preserve legacy basic fields via the collapsed extra section.
+  bindMasterSelects(root);
+  bindBasicComboInputs(root);
   const input=root.querySelector('[data-field="入院日"]');
   input?.addEventListener('input',()=>{
-    const el=$('#basicAdmissionDays');if(el)el.textContent=(daysSince(input.value)||'—')+'日';
+    const el=$('#basicAdmissionDays');if(el)el.textContent=(daysSince(input.value)||'—')+(daysSince(input.value)?'日':'');
   });
   const patient=selectedPatient;
   const gen=photoList(patient,'genogram'),admission=photoList(patient,'admission');

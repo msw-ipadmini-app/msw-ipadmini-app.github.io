@@ -436,3 +436,48 @@ body.msw-private { visibility: hidden !important; }
   border-style: dashed;
   opacity: 1;
 }
+
+/* BASIC7-ST1: confirmed seven-row patient data layout. Matches demo E layout. */
+#modal .basic-form-rows{display:grid;gap:8px}
+#modal .basic-row{display:grid;gap:6px;align-items:end;min-width:0}
+#modal .basic-r1{grid-template-columns:minmax(0,.86fr) minmax(0,1.1fr) minmax(0,.82fr)}
+#modal .basic-r2{grid-template-columns:minmax(0,.79fr) minmax(0,1.11fr) minmax(0,1.22fr) minmax(0,.77fr)}
+#modal .basic-r3{grid-template-columns:minmax(0,.92fr) minmax(0,1.9fr)}
+#modal .basic-r4{grid-template-columns:minmax(0,180px)}
+#modal .basic-r5,#modal .basic-r6,#modal .basic-r7{grid-template-columns:minmax(0,1fr)}
+#modal .basic-row .basic-field{min-width:0}
+#modal .basic-row .basic-field label{display:block;font-size:11px;margin-bottom:4px}
+#modal .basic-row .basic-field input,#modal .basic-row .basic-field textarea{min-width:0;width:100%;font-size:12px;min-height:35px;padding:7px 6px}
+#modal .basic-r5 textarea{height:70px;min-height:65px}
+#modal .basic-r7 textarea{height:67px;min-height:62px}
+#modal .basic-r1 .basic-bed-picker{white-space:normal;overflow-wrap:anywhere;padding:7px 6px;font-size:12px}
+#modal .basic-combo-input{display:flex;align-items:stretch;gap:3px;min-width:0}
+#modal .basic-combo-input input{flex:1;width:0;min-width:0}
+#modal .basic-combo-open{flex:none;padding:4px 5px;font-size:10px;color:#22566d;border:1px solid #97c4d3;background:#eff7fb;border-radius:7px;white-space:nowrap}
+#modal .basic-combo-options{display:flex;gap:4px;margin-top:4px;align-items:center}
+#modal .basic-combo-options[hidden]{display:none!important}
+#modal .basic-combo-options select{flex:1;min-width:0;max-width:100%;padding:5px 2px;font-size:11px;min-height:31px;border:1px solid #abc7d5;border-radius:5px;background:#fff}
+#modal .basic-combo-options button{flex:none;padding:5px 5px;font-size:10px;border:1px solid #adc9c9;border-radius:5px;background:#f1f7f7}
+#modal .basic-santherese{border:2px solid #efbc72;background:#fff3db;border-radius:10px;padding:10px 12px;min-width:0}
+#modal .basic-santherese label{display:flex;align-items:center;gap:9px;font-weight:800;font-size:14px;color:#74440a;cursor:pointer}
+#modal .basic-santherese input{width:21px;height:21px;accent-color:#d97706;flex:none;margin:0}
+#modal .basic-santherese-note{font-size:11px;color:#815917;line-height:1.5;margin:6px 0 0 30px}
+#modal .basic-private-hint{margin:8px 0 0;color:var(--muted);font-size:11px}
+@media(max-width:810px){#modal .basic-row{gap:4px}#modal .basic-row .basic-field input,#modal .basic-row .basic-field textarea{font-size:11px;padding:6px 4px}}
+@media(max-width:680px){#modal .basic-docs{grid-template-columns:repeat(2,minmax(0,1fr))}#modal .basic-santherese{grid-column:1 / -1}}
+@media(max-width:420px){#modal .basic-r2{grid-template-columns:repeat(2,minmax(0,1fr))}#modal .basic-docs{grid-template-columns:1fr}#modal .basic-santherese{grid-column:auto}}
+/* Orange indicates meeting status; duplicate-bed safety warning always wins. */
+#patientList .general-room-map .occupied-bed.santherese-bed,
+#patientList .icu-map .occupied-bed.santherese-bed,
+#patientList .unplaced-patient-grid .occupied-bed.santherese-bed{background:#ffe0a3;border:2px solid #d98b28;color:#63380b}
+#patientList .santherese-bed-mark{font-size:10px;font-weight:800;color:#8b510f;line-height:1.1}
+#patientList .santherese-nav{display:flex;gap:8px;flex-wrap:wrap}
+.santherese-nav{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 12px}
+.santherese-nav .is-selected{border-color:#3e9c89;background:#e2f4ef;color:#086151}
+.santherese-nav .santherese-filter.is-selected{border-color:#e9a652;background:#fff0d4;color:#87430b}
+.santherese-list h2{font-size:18px;margin:12px 0;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.santherese-target-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(195px,1fr));gap:10px}
+.santherese-target-card{background:#ffe0a3;border:2px solid #d98b28;border-radius:11px;padding:13px;text-align:left;display:grid;gap:6px;color:#63380b;cursor:pointer}
+.santherese-target-card strong{font-size:16px;overflow-wrap:anywhere}
+.santherese-target-card .target-small{font-size:12px}
+.santherese-target-card:focus-visible,.santherese-nav button:focus-visible{outline:3px solid #0f766e;outline-offset:2px}
