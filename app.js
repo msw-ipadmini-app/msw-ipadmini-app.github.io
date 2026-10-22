@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST4';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST5';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -521,11 +521,22 @@ function layoutBedNumbers(layout,patients){
   return layout.map(room=>({room:room.room,beds:room.beds.map(n=>bedKey(room.room,n))}));
 }
 function shortAdmissionDate(v){if(!v)return'';const d=new Date(v);if(Number.isNaN(d.getTime()))return esc(v);return`${d.getMonth()+1}/${d.getDate()}`}
+// Display-only patient flags: clinical entries and actual bed assignment remain unchanged.
+function patientDisplayFlags(p){
+  const data=p?.data||{};
+  return {
+    idMissing: !String(data['ＩＤ']??'').trim(),
+    surveyed: !!String(data['調査日']??'').trim(),
+    meeting: p?.sanThereseMeeting===true
+  };
+}
 function patientBedHtml(bed,patients=[]){
   if(!patients.length)return`<button class="bed-slot empty-bed" data-new-bed="${esc(bed)}"><b>${esc(bed)}</b><span>空床</span><small>タップして登録</small></button>`;
   if(patients.length>1)return`<button class="bed-slot occupied-bed duplicate-bed" data-bed="${esc(bed)}"><div class="bed-line"><b>${esc(bed)}</b></div><strong>${patients.length}名重複あり</strong><span>タップして全員を表示</span></button>`;
   const p=patients[0],days=daysSince(p.data['入院日'])||p.data['入院日数']||'',date=shortAdmissionDate(p.data['入院日']),tasks=p.tasks?.filter(t=>!t.done).length||0;
-  return`<button class="bed-slot occupied-bed ${p.sanThereseMeeting===true?'santherese-bed':''}" data-id="${esc(p.id)}"><div class="bed-line"><b>${esc(bed)}</b></div><strong>${esc(p.data['氏名']||'氏名未入力')}</strong><span class="bed-meta admission-line"><span>${date?esc(date):'—'}</span><span class="doctor">${esc(String(p.data['主治医']||'').replace(/医師\s*$/,'').trim()||'—')}</span><span class="days">${days?`${esc(days)}日目`:'—'}</span></span>${p.sanThereseMeeting===true?'<span class="santherese-bed-mark">● 検討会</span>':''}<div class="tags">${statusTag(getStatus(p))}${tasks?`<span class="tag red">要対応 ${tasks}</span>`:''}</div></button>`;
+  const flags=patientDisplayFlags(p);
+  const classes=[flags.meeting?'santherese-bed':'',flags.surveyed?'surveyed-bed':'',flags.idMissing?'id-missing-bed':''].filter(Boolean).join(' ');
+  return`<button class="bed-slot occupied-bed ${classes}" data-id="${esc(p.id)}"><div class="bed-line"><b>${esc(bed)}</b></div>${flags.idMissing?'<span class="id-missing-bed-label">ID未</span>':''}<strong>${esc(p.data['氏名']||'氏名未入力')}</strong><span class="bed-meta admission-line"><span>${date?esc(date):'—'}</span><span class="doctor">${esc(String(p.data['主治医']||'').replace(/医師\s*$/,'').trim()||'—')}</span><span class="days">${days?`${esc(days)}日目`:'—'}</span></span>${flags.meeting?'<span class="santherese-bed-mark">● 検討会</span>':''}<div class="tags">${statusTag(getStatus(p))}${tasks?`<span class="tag red">要対応 ${tasks}</span>`:''}</div></button>`;
 }
 function roomMapHtml(room,patients,q){
   return`<div class="room-block"><div class="room-title">${esc(room.room)}${room.room.startsWith('ICU')?'':'号室'}</div><div class="bed-grid">${room.beds.map(bed=>{const ps=patientsForBed(bed,patients);if(q&&!ps.length)return'';return patientBedHtml(bed,ps)}).join('')}</div></div>`;
@@ -538,7 +549,9 @@ function openDuplicateBed(bed){
   $$('.duplicate-bed-pick').forEach(btn=>btn.onclick=()=>{
     const sel=[...$$('.duplicate-bed-select')].find(x=>x.dataset.id===btn.dataset.id);
     if(!sel)return;
-    showGroupedBedPicker(sel.value,value=>{sel.value=value;btn.textContent=(value||'その他・未配置')+' ▾'});
+    const chosen=state.patients.find(p=>p.id===btn.dataset.id);
+    showGroupedBedPicker(sel.value,value=>{sel.value=value;btn.textContent=(value||'その他・未配置')+' ▾'},
+      {onDischarge:chosen?()=>startDischargeFlow(chosen):undefined});
   });
   $('#closeDuplicate').onclick=()=>$('#duplicateModal')?.remove();
   $$('.duplicate-open').forEach(btn=>btn.onclick=()=>{const p=state.patients.find(p=>p.id===btn.dataset.id);$('#duplicateModal')?.remove();if(p)openPatient(p)});
@@ -2263,11 +2276,13 @@ function bindPatientBedPicker(){
  btn.onclick=()=>showGroupedBedPicker(input.value,value=>{input.value=value;btn.textContent=(value||'その他・未配置')+' ▾';input.dispatchEvent(new Event('change',{bubbles:true}))},
    {onDischarge:()=>startDischargeFlow()});
 }
-function startDischargeFlow(){
- const p=selectedPatient;if(!p)return;
+function startDischargeFlow(p=selectedPatient){
+ if(!p)return;
+ if(selectedPatient&&selectedPatient!==p){alert('別の患者情報が編集中です。退院処理を中止しました。');return;}
  if(p._new){alert('先に患者情報を保存してください。');return;}
  const previousBed=$('#patientBedValue')?.value??p.data['ベッド番号']??'';
  const today=new Date().toLocaleDateString('sv-SE');
+ $('#dischargeFlow')?.remove();
  document.body.insertAdjacentHTML('beforeend',`<div class="bed-picker-shade" id="dischargeFlow" role="dialog" aria-modal="true" aria-label="退院日を選択"><div class="bed-picker-panel discharge-panel"><div class="bed-picker-head"><strong>退院日を選択</strong><button class="btn secondary" id="dischargeCancel">戻る</button></div><div class="discharge-content"><p><b>${esc(p.data['氏名']||'氏名未入力')}</b></p><label>退院日<input type="date" id="dischargeChosenDate" value="${today}"></label><p class="notice">退院確定後はベッドを空け、日誌の退院患者一覧に残します。サマリー入力完了までは削除されません。</p><button class="btn" id="dischargeReview">確認へ</button><div id="dischargeReviewBody"></div></div></div></div>`);
  const root=$('#dischargeFlow');$('#dischargeCancel').onclick=()=>root.remove();
  $('#dischargeReview').onclick=()=>{
@@ -2277,9 +2292,9 @@ function startDischargeFlow(){
   $('#dischargeReviewBody').innerHTML=`<div class="panel"><p><b>退院処理を確定しますか？</b></p><p>${esc(p.data['氏名']||'氏名未入力')} ／ 退院日：${esc(date)} ／ 退院前：${esc(previousBed||'その他・未配置')}</p><button class="btn" id="dischargeCommit">確定して退院一覧へ</button></div>`;
   $('#dischargeCommit').onclick=async()=>{
    const b=$('#dischargeCommit');b.disabled=true;
-   if(!await flushPatientAutoSave()){b.disabled=false;alert('患者情報の自動保存に失敗しました。退院処理を中止しました。');return;}
+   if(selectedPatient===p&&!await flushPatientAutoSave()){b.disabled=false;alert('患者情報の自動保存に失敗しました。退院処理を中止しました。');return;}
    const old={date:p.dischargeDate,pending:p.summaryPending,bed:p.data['ベッド番号'],former:p.formerBed};
-   try{p.formerBed=previousBed;p.dischargeDate=date;p.summaryPending=true;p.data['ベッド番号']='';p.updatedAt=nowISO();await save();root.remove();closePatient();screen='journal';render()}
+   try{p.formerBed=previousBed;p.dischargeDate=date;p.summaryPending=true;p.data['ベッド番号']='';p.updatedAt=nowISO();await save();root.remove();$('#duplicateModal')?.remove();if(selectedPatient===p)closePatient();screen='journal';render()}
    catch(e){p.dischargeDate=old.date;p.summaryPending=old.pending;p.data['ベッド番号']=old.bed;p.formerBed=old.former;alert('保存できませんでした：'+e.message);b.disabled=false}
   };
  };

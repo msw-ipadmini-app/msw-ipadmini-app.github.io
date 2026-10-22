@@ -533,3 +533,38 @@ body.msw-private { visibility: hidden !important; }
 #masterList .master-sort-up:disabled,#masterList .master-sort-down:disabled{background:#f2f6f5;color:#a0aeb0}
 #masterList .master-sort-status{font-size:10px;line-height:1.35}
 @media(max-width:450px){#masterList .master-sort-up,#masterList .master-sort-down{min-width:38px;min-height:38px}#masterList .master-sort-status{font-size:9px}}
+
+/* BASIC7-ST5: one compact, 6-item iPad mini navigation row. */
+.bottomnav{grid-template-columns:repeat(6,minmax(0,1fr))!important;align-items:center;gap:1px;padding:5px 6px calc(5px + env(safe-area-inset-bottom))!important}
+.bottomnav .navbtn{box-sizing:border-box;min-width:0;min-height:39px;padding:7px 1px!important;font-size:clamp(9px,1.45vw,12px)!important;white-space:nowrap;line-height:1.25;text-align:center}
+.bottomnav .navbtn .ico{display:inline-block!important;font-size:clamp(15px,2vw,19px)!important;line-height:1;vertical-align:-2px;margin:0 3px 0 0!important}
+.content{padding-bottom:calc(72px + env(safe-area-inset-bottom))!important}
+/* Show mutually exclusive background colors only on individual occupied map beds.
+   Top-left: original blue or meeting orange. Bottom-right: survey green.
+   An unrecorded hospital ID adds a red outline and explicit text label.
+   Duplicate bed warnings retain their higher-priority red warning presentation. */
+#patientList .occupied-bed:not(.duplicate-bed).surveyed-bed:not(.santherese-bed){
+ background-image:linear-gradient(135deg,#cfe4ff 50%,#ccefd7 50%)!important;
+ background-color:#cfe4ff!important;
+}
+#patientList .occupied-bed:not(.duplicate-bed).surveyed-bed.santherese-bed{
+ background-image:linear-gradient(135deg,#ffe0a3 50%,#ccefd7 50%)!important;
+ background-color:#ffe0a3!important;
+}
+#patientList .occupied-bed:not(.duplicate-bed).id-missing-bed:not(.santherese-bed):not(.surveyed-bed){
+ background:#ffe3e7!important;
+}
+#patientList .occupied-bed:not(.duplicate-bed).id-missing-bed{
+ position:relative;
+ border:2px solid #c83859!important;
+}
+#patientList .id-missing-bed-label{
+ position:absolute;right:2px;top:2px;box-sizing:border-box;
+ padding:1px 3px;border-radius:4px;background:#fff7f8;
+ color:#aa1636;font-size:clamp(8px,1.1vw,10px)!important;
+ line-height:1.2;font-weight:800;z-index:1;
+}
+#patientList .occupied-bed.id-missing-bed .bed-line{padding-right:25px}
+#patientList .duplicate-bed{background-image:none!important}
+/* Keep print output unchanged; the patient map is not the morning table. */
+@media print{.bottomnav{display:none!important}.content{padding-bottom:0!important}}
