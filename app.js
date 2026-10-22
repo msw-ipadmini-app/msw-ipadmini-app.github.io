@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST2';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST3';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -718,52 +718,92 @@ function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
   const limited=field==='市町村'?' maxlength="30"':'';
   const control=`<input type="${type}" ${common}${numeric}${limited} value="${esc(v)}">`;
   if(!['市町村','主治医','介護度'].includes(field))return `<div class="field basic-field"><label>${esc(label)}</label>${control}</div>`;
-  return `<div class="field basic-field basic-combo" data-basic-combo="${esc(field)}"><label>${esc(label)}</label><div class="basic-combo-input">${control}<span class="basic-combo-arrow" aria-hidden="true">▾</span></div><div class="basic-combo-options" role="listbox" hidden></div></div>`;
+  return `<div class="field basic-field basic-combo" data-basic-combo="${esc(field)}"><label>${esc(label)}</label><div class="basic-combo-input">${control}<button type="button" class="basic-combo-arrow" data-combo-open="${esc(field)}" aria-label="${esc(label)}の候補を開く">▾</button></div></div>`;
 }
 function bindBasicComboInputs(root){
- const boxes=[...root.querySelectorAll('[data-basic-combo]')];
- const close=()=>boxes.forEach(box=>{
-   const panel=box.querySelector('.basic-combo-options'),input=box.querySelector('input[data-field]');
-   if(panel)panel.hidden=true;if(input)input.setAttribute('aria-expanded','false');
- });
- const municipality=v=>/^[^0-9０-９@/\\:;〒]{1,30}(?:市|区|町|村)$/u.test(String(v).trim())&&!/丁目|番地|[0-9]+号/.test(v);
- boxes.forEach(box=>{
-  const field=box.dataset.basicCombo,input=box.querySelector('input[data-field]'),panel=box.querySelector('.basic-combo-options');
-  input.autocomplete='off';input.setAttribute('aria-haspopup','listbox');input.setAttribute('aria-expanded','false');
-  function show(filter=''){
-   close();panel.replaceChildren();
-   const hint=document.createElement('p');hint.className='basic-combo-hint';hint.textContent='候補をタップ・そのまま文字入力もできます';panel.append(hint);
-   const grid=document.createElement('div');grid.className='basic-combo-grid';
-   const list=masterValues(field,input.value).filter(v=>field!=='市町村'||municipality(v)).filter(v=>!filter||v.toLocaleLowerCase('ja').includes(filter.toLocaleLowerCase('ja'))).slice(0,60);
-   list.forEach(v=>{
-    const b=document.createElement('button');b.type='button';b.className='basic-combo-item';b.textContent=v;b.setAttribute('role','option');
-    b.addEventListener('pointerdown',e=>e.preventDefault());
-    b.onclick=()=>{input.value=v;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();input.blur();};grid.append(b);
-   });
-   if(list.length)panel.append(grid);
-   else{const msg=document.createElement('p');msg.className='basic-combo-hint';msg.textContent='一致する候補なし。文字入力できます。';panel.append(msg);}
-   const add=document.createElement('button');add.type='button';add.className='basic-combo-add';add.textContent='＋ 入力した文字を次回の候補に追加';
-   add.addEventListener('pointerdown',e=>e.preventDefault());
-   add.onclick=async()=>{
-    const value=input.value.trim();if(!value)return;
-    if(field==='市町村'&&!municipality(value)){alert('市町村名だけを登録してください。番地や数字は登録できません。');return;}
-    const prev=[...(state.masters?.[field]||[])];
-    if(prev.includes(value)){close();return;}
-    add.disabled=true;
-    try{await dataWriteTail;state.masters[field]=uniq([...prev,value]);await save();close();}
-    catch(e){state.masters[field]=prev;alert('候補を保存できませんでした：'+(e.message||e));}
-    finally{add.disabled=false;}
-   };
-   panel.append(add);panel.hidden=false;input.setAttribute('aria-expanded','true');
-   const r=input.getBoundingClientRect(),height=window.visualViewport?.height||window.innerHeight;
-   panel.classList.toggle('open-up',r.bottom>height-200&&r.top>210);
+  // Candidate choices are drawn as a screen-centered dialog rather than inside
+  // the small left column. This avoids overlap and clipping on iPad mini.
+  const boxes=[...root.querySelectorAll('[data-basic-combo]')];
+  let overlay=null;
+  const cityValid=value=>/^[^0-9０-９@/\\:;〒]{1,30}(?:市|区|町|村)$/u.test(String(value).trim())&&!/丁目|番地|[0-9]+号/.test(String(value));
+  function close(){if(overlay){overlay.remove();overlay=null}}
+  function show(box){
+    const modal=document.getElementById('modal');
+    if(!modal||!box.isConnected||!selectedPatient)return;
+    close();
+    const input=box.querySelector('input[data-field]'),field=box.dataset.basicCombo;
+    if(!input)return;
+    if(document.activeElement===input)input.blur();
+    overlay=document.createElement('div');overlay.className='basic-candidate-screen';
+    overlay.innerHTML='<div class="basic-candidate-shade"></div><section class="basic-candidate-dialog" role="dialog" aria-modal="true" aria-labelledby="basicCandidateTitle"><div class="basic-candidate-head"><strong id="basicCandidateTitle"></strong><button type="button" class="basic-candidate-close" aria-label="候補を閉じる">✕ 閉じる</button></div><p class="basic-candidate-hint">選びたい項目を1回タップしてください。</p><label class="basic-candidate-search-label">候補を絞り込む（任意）<input class="basic-candidate-search" type="search" autocomplete="off" placeholder="候補を検索"></label><div class="basic-candidate-list" role="listbox"></div><div class="basic-candidate-footer"><button type="button" class="basic-candidate-manual">自由入力する</button><button type="button" class="basic-candidate-save">入力中の文字を候補に追加</button></div><p class="basic-candidate-error" role="status" aria-live="polite"></p></section>';
+    modal.appendChild(overlay);
+    overlay.querySelector('#basicCandidateTitle').textContent=field==='市町村'?'住所（市町村のみ）の候補':field+'の候補';
+    const search=overlay.querySelector('.basic-candidate-search');
+    const list=overlay.querySelector('.basic-candidate-list');
+    const error=overlay.querySelector('.basic-candidate-error');
+    function paint(q=''){
+      list.replaceChildren();
+      const options=masterValues(field,input.value).filter(v=>field!=='市町村'||cityValid(v));
+      const filtered=options.filter(v=>!q||v.toLocaleLowerCase('ja').includes(q.toLocaleLowerCase('ja'))).slice(0,100);
+      if(!filtered.length){
+        const empty=document.createElement('p');empty.className='basic-candidate-empty';empty.textContent='一致する候補はありません。自由入力できます。';list.appendChild(empty);return;
+      }
+      for(const v of filtered){
+        const b=document.createElement('button');b.type='button';b.className='basic-candidate-item';b.setAttribute('role','option');b.textContent=v;
+        b.onclick=()=>{
+          // Reuse the existing patient autosave listeners and do not touch storage keys.
+          input.value=v;close();
+          input.dispatchEvent(new Event('input',{bubbles:true}));
+          input.dispatchEvent(new Event('change',{bubbles:true}));
+          input.blur();
+        };
+        list.appendChild(b);
+      }
+    }
+    overlay.querySelector('.basic-candidate-shade').onclick=close;
+    overlay.querySelector('.basic-candidate-close').onclick=close;
+    search.oninput=()=>paint(search.value);
+    overlay.querySelector('.basic-candidate-manual').onclick=()=>{
+      close();box.dataset.manualTyping='1';input.focus();
+      const n=input.value.length;try{input.setSelectionRange(n,n)}catch(_){}
+    };
+    overlay.querySelector('.basic-candidate-save').onclick=async e=>{
+      const value=input.value.trim();
+      if(!value){error.textContent='先に「自由入力する」で文字を入力してください。';return}
+      if(field==='市町村'&&!cityValid(value)){error.textContent='市町村名のみ登録できます。番地や数字は登録しないでください。';return}
+      const prev=[...(state.masters?.[field]||[])];
+      if(prev.includes(value)){close();return}
+      const btn=e.currentTarget;btn.disabled=true;
+      try{
+        await dataWriteTail;
+        state.masters[field]=uniq([...prev,value]);
+        await save();close();
+      }catch(err){state.masters[field]=prev;error.textContent='候補を保存できませんでした：'+String(err.message||err)}
+      finally{if(btn.isConnected)btn.disabled=false}
+    };
+    overlay.addEventListener('keydown',e=>{if(e.key==='Escape'){e.preventDefault();close()}});
+    paint();
+    overlay.querySelector('.basic-candidate-close').focus({preventScroll:true});
   }
-  input.addEventListener('focus',()=>show());
-  input.addEventListener('click',()=>{if(panel.hidden)show()});
-  input.addEventListener('input',e=>{if(!e.isComposing&&!patientIME)show(input.value)});
-  input.addEventListener('keydown',e=>{if(e.key==='Escape'){close();input.blur()}});
- });
- root.addEventListener('pointerdown',e=>{if(!e.target.closest('[data-basic-combo]'))close()});
+  for(const box of boxes){
+    const input=box.querySelector('input[data-field]'),arrow=box.querySelector('[data-combo-open]');
+    input.autocomplete='off';
+    // Cancel mobile focus on ordinary tap so the iPad keyboard does not cover the list.
+    input.addEventListener('pointerdown',e=>{
+      if(box.dataset.manualTyping==='1')return;
+      if(e.cancelable)e.preventDefault();
+      show(box);
+    });
+    input.addEventListener('click',()=>{if(box.dataset.manualTyping!=='1'&&!overlay)show(box)});
+    input.addEventListener('focus',()=>{
+      // Keyboard focus (rather than touch) still opens the accessible chooser.
+      if(box.dataset.manualTyping!=='1'&&!overlay)show(box);
+    });
+    input.addEventListener('blur',()=>{
+      if(box.dataset.manualTyping==='1')delete box.dataset.manualTyping;
+    });
+    arrow.onclick=()=>show(box);
+  }
 }
 function basicDocumentHtml(){
   const gen=photoList(selectedPatient,'genogram');
