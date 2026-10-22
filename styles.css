@@ -568,3 +568,21 @@ body.msw-private { visibility: hidden !important; }
 #patientList .duplicate-bed{background-image:none!important}
 /* Keep print output unchanged; the patient map is not the morning table. */
 @media print{.bottomnav{display:none!important}.content{padding-bottom:0!important}}
+
+/* BASIC7-ST6: explicit survey-date removal, independent of iPadOS native date reset. */
+#modal .basic-survey-date .basic-survey-date-header{
+  display:flex;align-items:center;justify-content:space-between;
+  gap:4px;min-width:0;margin-bottom:4px
+}
+#modal .basic-survey-date .basic-survey-date-header label{
+  min-width:0;margin-bottom:0;line-height:1.25
+}
+#modal .basic-survey-date .basic-survey-date-clear{
+  box-sizing:border-box;flex:none;min-height:28px;padding:3px 6px;
+  border:1px solid #c4a5aa;border-radius:6px;background:#fff5f6;
+  color:#9b3141;font-size:11px;font-weight:700;line-height:1.25;
+  cursor:pointer;touch-action:manipulation
+}
+#modal .basic-survey-date .basic-survey-date-clear:disabled{
+  opacity:.45;cursor:default
+}

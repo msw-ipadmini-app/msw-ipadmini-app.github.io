@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST5';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST6';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -744,6 +744,7 @@ function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
   const numeric=field==='ＩＤ'?' inputmode="numeric" autocomplete="off"':'';
   const limited=field==='市町村'?' maxlength="30"':'';
   const control=`<input type="${type}" ${common}${numeric}${limited} value="${esc(v)}">`;
+  if(field==='調査日')return `<div class="field basic-field basic-survey-date"><div class="basic-survey-date-header"><label>${esc(label)}</label><button type="button" id="basicSurveyDateClear" class="basic-survey-date-clear" aria-label="この患者の介護調査日を消去">日付を消去</button></div>${control}</div>`;
   if(!['市町村','主治医','介護度'].includes(field))return `<div class="field basic-field"><label>${esc(label)}</label>${control}</div>`;
   return `<div class="field basic-field basic-combo" data-basic-combo="${esc(field)}"><label>${esc(label)}</label><div class="basic-combo-input">${control}<button type="button" class="basic-combo-arrow" data-combo-open="${esc(field)}" aria-label="${esc(label)}の候補を開く">▾</button></div></div>`;
 }
@@ -856,6 +857,35 @@ function basicDocumentHtml(){
     </section>
   </aside>`;
 }
+// iPadOS native date-picker "reset" may select today instead of clearing the date.
+// This explicit button clears only the survey-date input and waits for durable
+// patient autosave, so the bed's green status clears after returning to the map.
+function bindSurveyDateClear(root){
+  const input=root.querySelector('[data-field="調査日"]');
+  const clear=root.querySelector('#basicSurveyDateClear');
+  if(!input||!clear)return;
+  const sync=()=>{if(clear.isConnected)clear.disabled=!input.value};
+  input.addEventListener('input',sync);
+  input.addEventListener('change',sync);
+  sync();
+  clear.onclick=async()=>{
+    const patient=selectedPatient;
+    if(!patient||!root.isConnected||!input.isConnected||!input.value)return;
+    if(!confirm('この患者の介護調査日を空欄にしますか？\n患者：'+String(patient.data?.['氏名']||'氏名未入力')+'\n※他の患者の情報は変更しません。'))return;
+    clear.disabled=true;
+    input.value='';
+    // Reuse ordinary capture, revision tracking and encrypted autosave.
+    input.dispatchEvent(new Event('input',{bubbles:true}));
+    input.dispatchEvent(new Event('change',{bubbles:true}));
+    let ok=false;
+    try{ok=await flushPatientAutoSave();}
+    catch(e){ok=false;}
+    if(selectedPatient===patient&&clear.isConnected){
+      sync();
+      if(!ok)alert('調査日の消去を保存できませんでした。画面上部の保存状態を確認してください。');
+    }
+  };
+}
 function renderBasicDashboard(){
   const root=$('#tabbody');
   root.innerHTML=`<div class="basic-dashboard">
@@ -879,6 +909,7 @@ function renderBasicDashboard(){
   bindPatientBedPicker();
   bindMasterSelects(root);
   bindBasicComboInputs(root);
+  bindSurveyDateClear(root);
   const input=root.querySelector('[data-field="入院日"]');
   input?.addEventListener('input',()=>{
     const el=$('#basicAdmissionDays');if(el)el.textContent=(daysSince(input.value)||'—')+(daysSince(input.value)?'日':'');
