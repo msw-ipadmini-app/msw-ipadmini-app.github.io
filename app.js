@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST1';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST2';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -713,43 +713,57 @@ function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
   const placeholder=field==='家構'?'例：2同別':field==='市町村'?'例：水戸市（番地は入力しない）':field==='介護情報'?'ケアマネ・介護サービスなど':'';
   const common=`data-field="${esc(field)}" aria-label="${esc(label)}" placeholder="${esc(placeholder)}"`;
   if(multiline)return `<div class="field basic-field"><label>${esc(label)}</label><textarea ${common} rows="${rows}">${esc(v)}</textarea></div>`;
-  const type=field==='入院日'?'date':'text';
+  const type=(field==='入院日'||field==='調査日')?'date':'text';
   const numeric=field==='ＩＤ'?' inputmode="numeric" autocomplete="off"':'';
   const limited=field==='市町村'?' maxlength="30"':'';
   const control=`<input type="${type}" ${common}${numeric}${limited} value="${esc(v)}">`;
   if(!['市町村','主治医','介護度'].includes(field))return `<div class="field basic-field"><label>${esc(label)}</label>${control}</div>`;
-  return `<div class="field basic-field basic-combo" data-basic-combo="${esc(field)}"><label>${esc(label)}</label><div class="basic-combo-input">${control}<button type="button" class="basic-combo-open" data-combo-open="${esc(field)}" aria-label="${esc(label)}の候補を開く" aria-expanded="false">候補 ▾</button></div><div class="basic-combo-options" hidden><select aria-label="${esc(label)}の候補一覧" data-combo-select="${esc(field)}"></select><button type="button" class="basic-combo-choose" data-combo-choose="${esc(field)}">選択</button><button type="button" class="basic-combo-add" data-combo-add="${esc(field)}" title="入力した値を候補に追加">＋追加</button></div></div>`;
+  return `<div class="field basic-field basic-combo" data-basic-combo="${esc(field)}"><label>${esc(label)}</label><div class="basic-combo-input">${control}<span class="basic-combo-arrow" aria-hidden="true">▾</span></div><div class="basic-combo-options" role="listbox" hidden></div></div>`;
 }
 function bindBasicComboInputs(root){
-  root.querySelectorAll('[data-basic-combo]').forEach(container=>{
-    const field=container.dataset.basicCombo;
-    const input=container.querySelector('[data-field]');
-    const panel=container.querySelector('.basic-combo-options');
-    const select=container.querySelector('[data-combo-select]');
-    const open=container.querySelector('[data-combo-open]');
-    const choose=container.querySelector('[data-combo-choose]');
-    const add=container.querySelector('[data-combo-add]');
-    const refill=()=>{const values=masterValues(field,input.value);select.innerHTML=values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('')};
-    open.onclick=()=>{if(panel.hidden){refill();panel.hidden=false;open.setAttribute('aria-expanded','true')}else{panel.hidden=true;open.setAttribute('aria-expanded','false')}};
-    choose.onclick=()=>{if(!select.value)return;input.value=select.value;input.dispatchEvent(new Event('input',{bubbles:true}));panel.hidden=true;open.setAttribute('aria-expanded','false')};
-    add.onclick=async()=>{
-      const value=input.value.trim();
-      if(!value){alert('候補へ追加する内容を先に入力してください。');return;}
-      if(field==='市町村'&&value.length>30){alert('市町村名だけを入力してください。');return;}
-      const prev=[...(state.masters?.[field]||[])];
-      if(prev.includes(value)){refill();select.value=value;panel.hidden=true;open.setAttribute('aria-expanded','false');return;}
-      add.disabled=true;
-      try{
-        await dataWriteTail;
-        // Copy-on-write to avoid an accidental persistent in-memory change on error.
-        state.masters[field]=uniq([...prev,value]);
-        await save();
-        refill();select.value=value;
-        panel.hidden=true;open.setAttribute('aria-expanded','false');
-      }catch(e){state.masters[field]=prev;alert('候補の保存に失敗しました：'+(e.message||e))}
-      finally{add.disabled=false}
-    };
-  });
+ const boxes=[...root.querySelectorAll('[data-basic-combo]')];
+ const close=()=>boxes.forEach(box=>{
+   const panel=box.querySelector('.basic-combo-options'),input=box.querySelector('input[data-field]');
+   if(panel)panel.hidden=true;if(input)input.setAttribute('aria-expanded','false');
+ });
+ const municipality=v=>/^[^0-9０-９@/\\:;〒]{1,30}(?:市|区|町|村)$/u.test(String(v).trim())&&!/丁目|番地|[0-9]+号/.test(v);
+ boxes.forEach(box=>{
+  const field=box.dataset.basicCombo,input=box.querySelector('input[data-field]'),panel=box.querySelector('.basic-combo-options');
+  input.autocomplete='off';input.setAttribute('aria-haspopup','listbox');input.setAttribute('aria-expanded','false');
+  function show(filter=''){
+   close();panel.replaceChildren();
+   const hint=document.createElement('p');hint.className='basic-combo-hint';hint.textContent='候補をタップ・そのまま文字入力もできます';panel.append(hint);
+   const grid=document.createElement('div');grid.className='basic-combo-grid';
+   const list=masterValues(field,input.value).filter(v=>field!=='市町村'||municipality(v)).filter(v=>!filter||v.toLocaleLowerCase('ja').includes(filter.toLocaleLowerCase('ja'))).slice(0,60);
+   list.forEach(v=>{
+    const b=document.createElement('button');b.type='button';b.className='basic-combo-item';b.textContent=v;b.setAttribute('role','option');
+    b.addEventListener('pointerdown',e=>e.preventDefault());
+    b.onclick=()=>{input.value=v;input.dispatchEvent(new Event('input',{bubbles:true}));input.dispatchEvent(new Event('change',{bubbles:true}));close();input.blur();};grid.append(b);
+   });
+   if(list.length)panel.append(grid);
+   else{const msg=document.createElement('p');msg.className='basic-combo-hint';msg.textContent='一致する候補なし。文字入力できます。';panel.append(msg);}
+   const add=document.createElement('button');add.type='button';add.className='basic-combo-add';add.textContent='＋ 入力した文字を次回の候補に追加';
+   add.addEventListener('pointerdown',e=>e.preventDefault());
+   add.onclick=async()=>{
+    const value=input.value.trim();if(!value)return;
+    if(field==='市町村'&&!municipality(value)){alert('市町村名だけを登録してください。番地や数字は登録できません。');return;}
+    const prev=[...(state.masters?.[field]||[])];
+    if(prev.includes(value)){close();return;}
+    add.disabled=true;
+    try{await dataWriteTail;state.masters[field]=uniq([...prev,value]);await save();close();}
+    catch(e){state.masters[field]=prev;alert('候補を保存できませんでした：'+(e.message||e));}
+    finally{add.disabled=false;}
+   };
+   panel.append(add);panel.hidden=false;input.setAttribute('aria-expanded','true');
+   const r=input.getBoundingClientRect(),height=window.visualViewport?.height||window.innerHeight;
+   panel.classList.toggle('open-up',r.bottom>height-200&&r.top>210);
+  }
+  input.addEventListener('focus',()=>show());
+  input.addEventListener('click',()=>{if(panel.hidden)show()});
+  input.addEventListener('input',e=>{if(!e.isComposing&&!patientIME)show(input.value)});
+  input.addEventListener('keydown',e=>{if(e.key==='Escape'){close();input.blur()}});
+ });
+ root.addEventListener('pointerdown',e=>{if(!e.target.closest('[data-basic-combo]'))close()});
 }
 function basicDocumentHtml(){
   const gen=photoList(selectedPatient,'genogram');
@@ -783,7 +797,7 @@ function renderBasicDashboard(){
         <div class="basic-row basic-r1">${basicFieldHtml('ベッド番号','ベッド番号')}${basicFieldHtml('入院日','入院日')}${basicFieldHtml('入院日数','入院日数')}</div>
         <div class="basic-row basic-r2">${basicFieldHtml('ＩＤ','ID')}${basicFieldHtml('氏名','氏名')}${basicFieldHtml('市町村','住所（市町村のみ）')}${basicFieldHtml('家構','家族構成')}</div>
         <div class="basic-row basic-r3">${basicFieldHtml('主治医','主治医')}${basicFieldHtml('病名','病名')}</div>
-        <div class="basic-row basic-r4">${basicFieldHtml('介護度','介護度')}</div>
+        <div class="basic-row basic-r4">${basicFieldHtml('介護度','介護度')}${basicFieldHtml('調査日','調査日')}</div>
         <div class="basic-row basic-r5">${basicFieldHtml('介護情報','介護情報（広め）',{multiline:true,rows:2})}</div>
         <div class="basic-row basic-r6">${basicFieldHtml('入院元','入院元')}</div>
         <div class="basic-row basic-r7">${basicFieldHtml('備考','備考',{multiline:true,rows:2})}</div>
