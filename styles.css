@@ -522,3 +522,14 @@ body.msw-private { visibility: hidden !important; }
 #modal .basic-candidate-save{background:#f6fafb;border:1px solid #bad5d8;color:#27515e}
 #modal .basic-candidate-error{min-height:0;margin:0;font-size:12px;color:#aa3727;line-height:1.5}
 @media(max-width:450px){#modal .basic-candidate-dialog{padding:10px}#modal .basic-candidate-head strong{font-size:17px}#modal .basic-candidate-list .basic-candidate-item{font-size:14px}}
+
+/* BASIC7-ST4 master candidate order control for iPad mini */
+#masterList .master-sort-guide{margin:4px 0 11px;font-size:13px;line-height:1.5;color:#106759}
+#masterList .master-sort-row{display:flex;align-items:center;justify-content:space-between;gap:7px;min-width:0}
+#masterList .master-sort-name{flex:1;min-width:0;overflow-wrap:anywhere}
+#masterList .master-sort-controls{display:flex;align-items:center;justify-content:flex-end;gap:5px;flex-wrap:wrap}
+#masterList .master-sort-buttons{display:flex;gap:5px}
+#masterList .master-sort-up,#masterList .master-sort-down{box-sizing:border-box;min-width:42px;min-height:42px;border:1px solid #9ac4b7;background:#eaf6f2;color:#0b6250;border-radius:8px;font-size:18px;font-weight:800;touch-action:manipulation}
+#masterList .master-sort-up:disabled,#masterList .master-sort-down:disabled{background:#f2f6f5;color:#a0aeb0}
+#masterList .master-sort-status{font-size:10px;line-height:1.35}
+@media(max-width:450px){#masterList .master-sort-up,#masterList .master-sort-down{min-width:38px;min-height:38px}#masterList .master-sort-status{font-size:9px}}

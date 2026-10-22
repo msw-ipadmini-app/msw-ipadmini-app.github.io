@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST3';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST4';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -96,9 +96,23 @@ function ensureStateSchema(target=state){
 }
 function uniq(a){return [...new Set(a.map(x=>String(x).trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,'ja',{numeric:true}));}
 function officialBeds(){return [...BED_LAYOUT,...ICU_LAYOUT].flatMap(r=>r.beds.map(n=>bedKey(r.room,n)))}
+const ORDERABLE_MASTER_FIELDS=new Set(['介護度','市町村','主治医']);
+function applyMasterDisplayOrder(f,values,order){
+  const available=uniq(values),allowed=new Set(available),seen=new Set(),out=[];
+  for(const entry of Array.isArray(order)?order:[]){
+    const v=String(entry??'').trim();
+    if(allowed.has(v)&&!seen.has(v)){seen.add(v);out.push(v)}
+  }
+  for(const v of available)if(!seen.has(v)){seen.add(v);out.push(v)}
+  return out;
+}
 function masterValues(f,current=''){
   if(f==='ベッド番号')return officialBeds();
-  ensureStateSchema();return uniq([...(state.masters?.[f]||[]),...(current?[current]:[])]);
+  ensureStateSchema();
+  const values=uniq([...(state.masters?.[f]||[]),...(current?[current]:[])]);
+  if(!ORDERABLE_MASTER_FIELDS.has(f))return values;
+  const saved=state.masterOrder?.[f];
+  return applyMasterDisplayOrder(f,values,Array.isArray(saved)?saved:f==='介護度'?defaultMasters['介護度']:[]);
 }
 function masterSelectHtml(f,v='',attrs='data-field="'+f+'"'){
   if(f==='ベッド番号'){
@@ -1410,7 +1424,7 @@ function drawDrugs(){const q=($('#dq')?.value||'').toLowerCase().trim();const a=
 function renderMasters(){
   ensureStateSchema();
   const fields=['進捗ステータス','経過記録種別',...masterFields];
-  $('#main').innerHTML=`<div class="hero"><div><h1>マスター管理</h1><p>入力候補をここで管理します。患者入力中でも「＋ リストにない → 新規登録」から追加できます。</p></div></div>
+  $('#main').innerHTML=`<div class="hero"><div><h1>マスター管理</h1><p>入力候補を管理します。介護度・住所（市町村）・主治医は↑↓で並び替えできます。</p></div></div>
   <div class="panel"><div class="form-grid"><div class="field span2"><label>編集する項目</label><select id="mf">${fields.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div></div></div>
   <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" placeholder="新しい候補を入力"><button class="btn" id="addMaster">＋追加</button></div><div id="masterList"></div></div>`;
   $('#mf').onchange=drawMasterList; $('#addMaster').onclick=addMasterFromScreen; $('#newMaster').onkeydown=e=>{if(e.key==='Enter')addMasterFromScreen()}; drawMasterList();
@@ -1441,22 +1455,53 @@ async function commitMasterValues(field,values){
   }catch(e){alert('マスターの変更を保存できませんでした。元の候補は保持しています：'+(e.message||e));return false;}
   finally{if(began)endMaintenance(action);masterWriteBusy=false;}
 }
+async function commitMasterOrder(field,ordered){
+  if(!ORDERABLE_MASTER_FIELDS.has(field))return false;
+  if(masterWriteBusy){alert('ほかの保存処理が終わってから操作してください。');return false;}
+  const current=masterValues(field);
+  if(!Array.isArray(ordered)||ordered.length!==current.length||new Set(ordered).size!==current.length||ordered.some(v=>!current.includes(v))){
+    alert('候補の内容が変更されたため、読み直してください。');return false;
+  }
+  const action='マスターの並び替え';masterWriteBusy=true;let began=false;
+  try{
+    await beginMaintenance(action);began=true;
+    const activeKey=key;
+    const next={...state,masterOrder:{...(state.masterOrder||{}),[field]:ordered.slice()},updatedAt:nowISO()};
+    await orderedDataWrite(async()=>idbSet('data',await encryptPatientIndex(next,activeKey)));
+    if(activeKey!==key)throw new Error('ロック状態が変わりました');
+    state=next;resetAutoLock();return true;
+  }catch(e){alert('並び順の保存に失敗しました。元の順序を保持します：'+String(e.message||e));return false;}
+  finally{if(began)endMaintenance(action);masterWriteBusy=false;}
+}
 function drawMasterList(){
-  const f=$('#mf').value, vals=masterValues(f); $('#masterTitle').textContent=`${f}　${vals.length}件`;
-  $('#masterList').innerHTML=vals.length?vals.map((v,i)=>{
-    const protectedValue=masterValueIsProtected(f,v);
-    return `<div class="settings-row"><div><b>${esc(v)}</b></div>${protectedValue?'<span class="notice">標準・使用中のため削除不可</span>':`<button class="btn danger masterDel" data-i="${i}">削除</button>`}</div>`;
-  }).join(''):'<div class="empty">候補がありません</div>';
-  $$('.masterDel').forEach(b=>b.onclick=async()=>{
-    const val=vals[+b.dataset.i];
-    if(masterValueIsProtected(f,val)){drawMasterList();return;}
-    if(!confirm(`「${val}」をマスターから削除しますか？\n既存患者に入力済みの値は消えません。`))return;
-    b.disabled=true;
-    try{
-      const next=(state.masters[f]||[]).filter(x=>x!==val);
-      if(await commitMasterValues(f,next))drawMasterList();
-    }finally{if(b.isConnected)b.disabled=false;}
-  });
+ const f=$('#mf').value,vals=masterValues(f),ordered=ORDERABLE_MASTER_FIELDS.has(f);
+ $('#masterTitle').textContent=`${f}　${vals.length}件`;
+ const host=$('#masterList');
+ host.innerHTML=(ordered?'<p class="master-sort-guide">「↑」「↓」で好きな順番に変更。自動保存され、患者情報の候補画面にも反映されます。</p>':'')+
+ (vals.length?vals.map((v,i)=>{
+  const move=ordered?`<div class="master-sort-buttons"><button type="button" class="master-sort-up" data-i="${i}" aria-label="${esc(v)}を上に移動" ${i===0?'disabled':''}>↑</button><button type="button" class="master-sort-down" data-i="${i}" aria-label="${esc(v)}を下に移動" ${i===vals.length-1?'disabled':''}>↓</button></div>`:'';
+  const other=masterValueIsProtected(f,v)?'<span class="notice master-sort-status">標準・使用中：削除不可</span>':`<button class="btn danger masterDel" data-i="${i}" type="button">削除</button>`;
+  return `<div class="settings-row master-sort-row"><div class="master-sort-name"><b>${esc(v)}</b></div><div class="master-sort-controls">${move}${other}</div></div>`;
+ }).join(''):'<div class="empty">候補がありません</div>');
+ host.querySelectorAll('.master-sort-up,.master-sort-down').forEach(btn=>btn.onclick=async()=>{
+  if(masterWriteBusy)return;
+  const from=Number(btn.dataset.i),to=from+(btn.classList.contains('master-sort-up')?-1:1);
+  if(from<0||from>=vals.length||to<0||to>=vals.length)return;
+  const next=vals.slice();[next[from],next[to]]=[next[to],next[from]];
+  host.querySelectorAll('button').forEach(b=>b.disabled=true);
+  await commitMasterOrder(f,next);
+  if($('#mf')?.value===f&&host.isConnected)drawMasterList();
+ });
+ host.querySelectorAll('.masterDel').forEach(btn=>btn.onclick=async()=>{
+  const value=vals[Number(btn.dataset.i)];
+  if(masterValueIsProtected(f,value)){drawMasterList();return;}
+  if(!confirm(`「${value}」をマスターから削除しますか？\n既存患者に入力済みの値は消えません。`))return;
+  btn.disabled=true;
+  try{
+   const next=(state.masters[f]||[]).filter(x=>x!==value);
+   if(await commitMasterValues(f,next)&&$('#mf')?.value===f)drawMasterList();
+  }finally{if(btn.isConnected)btn.disabled=false}
+ });
 }
 async function addMasterFromScreen(){
   const input=$('#newMaster'),btn=$('#addMaster'),f=$('#mf').value,v=input?.value.trim();
