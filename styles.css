@@ -618,3 +618,7 @@ body.msw-private { visibility: hidden !important; }
 #modal .basic-survey-date .basic-survey-date-line input[type="date"]{flex:1 1 auto;width:0;min-width:0;min-height:35px;padding:5px 2px;font-size:11px}
 #modal .basic-survey-date .basic-survey-date-line .basic-survey-date-clear{flex:none;min-height:35px;padding:4px 5px;font-size:10px;white-space:nowrap}
 @media(max-width:810px){#modal .basic-r4{grid-template-columns:minmax(0,135px) minmax(0,1fr)}}
+
+/* MASTERCITY2: visible, persistent feedback after every add attempt. */
+#masterAddStatus.master-add-status{display:block;min-height:38px;margin:8px 0 10px;padding:9px 12px;border:1px solid #b7d8cd;border-radius:8px;background:#edf8f3;color:#164e43;font-size:13px;font-weight:700;line-height:1.5;white-space:normal;overflow-wrap:anywhere}
+#addMaster:disabled{opacity:.6;cursor:progress}

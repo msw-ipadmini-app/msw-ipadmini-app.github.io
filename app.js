@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTERCITY1';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTERCITY2';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -1491,16 +1491,27 @@ function validMunicipalityCandidate(value){
    &&/^[^0-9@/\\:;〒]+(?:市|区|町|村)$/u.test(text)
    &&!/丁目|番地|地番|[0-9]+号|郵便|電話|住所/.test(text);
 }
+let masterSelectedField='市町村';
 function renderMasters(){
   ensureStateSchema();
   const fields=['進捗ステータス','経過記録種別',...masterFields];
   $('#main').innerHTML=`<div class="hero"><div><h1>マスター管理</h1><p>入力候補を管理します。介護度・住所（市町村）・主治医は↑↓で並び替えできます。</p></div></div>
   <div class="panel"><div class="form-grid"><div class="field span2"><label>編集する項目</label><select id="mf">${fields.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div></div></div>
-  <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" autocomplete="off" placeholder="新しい候補を入力"><button class="btn" id="addMaster">＋追加</button></div><p id="masterAddStatus" class="notice" role="status" aria-live="polite"></p><div id="masterList"></div></div>`;
-  $('#mf').onchange=()=>{$('#masterAddStatus').textContent='';drawMasterList()};
-  $('#addMaster').onclick=addMasterFromScreen;
-  $('#newMaster').onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();void addMasterFromScreen()}};
-  drawMasterList();
+  <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" autocomplete="off" placeholder="新しい候補を入力"><button type="button" class="btn" id="addMaster">＋追加</button></div><p id="masterAddStatus" class="notice master-add-status" role="status" aria-live="polite">登録先：市町村。候補を入力して「＋追加」を押してください。</p><div id="masterList"></div></div>`;
+  // Default to city master, and retain the operator's selected field during
+  // this session. The selected field is shown directly beside add feedback.
+  const selector=$('#mf'),entry=$('#newMaster'),button=$('#addMaster'),status=$('#masterAddStatus');
+  selector.value=fields.includes(masterSelectedField)?masterSelectedField:'市町村';
+  const syncTarget=()=>{
+    masterSelectedField=selector.value;
+    entry.placeholder=masterSelectedField==='市町村'?'例：石岡市':'「'+masterSelectedField+'」の新しい候補';
+    status.textContent='登録先：'+masterSelectedField+'。新しい候補を入力して「＋追加」を押してください。';
+    drawMasterList();
+  };
+  selector.onchange=syncTarget;
+  button.onclick=()=>{void addMasterFromScreen();};
+  entry.onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();void addMasterFromScreen();}};
+  syncTarget();
 }
 // Some dropdown values are system defaults or are still used by patients.
 // Deleting them here would appear to succeed, then silently recreate them
@@ -1576,25 +1587,54 @@ function drawMasterList(){
   }finally{if(btn.isConnected)btn.disabled=false}
  });
 }
+// Show feedback before any synchronous or asynchronous validation/work.
+// Staff should never be left with an unchanged field and no explanation.
 async function addMasterFromScreen(){
   const input=$('#newMaster'),btn=$('#addMaster'),selector=$('#mf'),status=$('#masterAddStatus');
-  if(!input||!btn||!selector||!status)return;
-  const f=selector.value,v=String(input.value||'').trim().normalize('NFKC');
-  if(!v){status.textContent='追加する候補を入力してください。';return;}
-  if(f==='ベッド番号'){status.textContent='ベッド番号は固定されているため追加できません。';return;}
-  if(f==='市町村'&&!validMunicipalityCandidate(v)){
-    status.textContent='市・区・町・村で終わる市町村名のみ入力してください（例：石岡市）。番地・数字は登録できません。';return;
+  const inform=message=>{if(status&&status.isConnected)status.textContent=message;else alert(message);};
+  if(!input||!btn||!selector){
+    inform('マスター登録画面が正しく読み込まれていません。患者データは変更していません。');
+    return;
   }
-  if(masterValues(f).includes(v)){status.textContent='「'+v+'」はすでに候補に登録されています。';return;}
-  btn.disabled=true;status.textContent='候補を暗号化保存しています…';
+  const f=String(selector.value||'');
+  inform('「'+f+'」への追加ボタンを押しました。入力内容を確認しています…');
+  if(btn.disabled){inform('現在、別の保存処理を実行中です。保存完了を確認してください。');return;}
+  btn.disabled=true;
+  const originalText=String(input.value||''),v=originalText.trim().normalize('NFKC');
   try{
-    const saved=await commitMasterValues(f,[...(state.masters?.[f]||[]),v]);
-    if(!saved){status.textContent='登録できませんでした。保存エラーの表示を確認してください。';return;}
-    if(input.isConnected)input.value='';
-    if(selector.isConnected&&selector.value===f){drawMasterList();status.textContent='「'+v+'」を登録しました。患者情報の候補にも表示されます。';}
-  }finally{if(btn.isConnected)btn.disabled=false;}
+    if(!v){inform('登録する候補が空欄です。文字を入力してください。');return;}
+    if(f==='ベッド番号'){inform('ベッド番号は固定です。候補を追加できません。');return;}
+    if(f==='市町村'&&!validMunicipalityCandidate(v)){
+      inform('「'+v+'」は市町村名として登録できません。市・区・町・村で終わる自治体名を入力してください。住所・番地・電話番号は登録できません。');
+      return;
+    }
+    if(!state||!key){inform('アプリがロックされているため登録できません。');return;}
+    if(masterValues(f).includes(v)){
+      inform('「'+v+'」はすでに「'+f+'」の候補に登録されています。下の一覧で確認してください。');
+      return;
+    }
+    inform('「'+v+'」を「'+f+'」へ暗号化保存しています…');
+    const ok=await commitMasterValues(f,[...(state.masters?.[f]||[]),v]);
+    if(!ok){inform('保存できませんでした。エラー表示を確認してください。入力文字は残しています。');return;}
+    // Confirm the encrypted IndexedDB record can actually be read again.
+    // Do not display or export patient data during this check.
+    const blob=await idbGet('data');
+    const saved=await decryptObj(blob,key);
+    if(!Array.isArray(saved?.masters?.[f])||!saved.masters[f].includes(v)){
+      inform('保存後の読み戻し確認ができませんでした。候補一覧を確認してください。入力文字は残しています。');
+      return;
+    }
+    if(selector.isConnected&&selector.value===f){
+      drawMasterList();
+      inform('登録完了：「'+v+'」を「'+f+'」に保存し、再読み込みで確認できました。');
+    }
+    if(input.isConnected&&input.value===originalText)input.value='';
+  }catch(error){
+    inform('登録処理で問題が発生しました：'+String(error?.message||error).slice(0,140)+'。入力文字は残しています。');
+  }finally{
+    if(btn.isConnected)btn.disabled=false;
+  }
 }
-
 // Diagnostic report intentionally contains only release/runtime facts, NOT patients,
 // passwords, photos, hospital IDs, notes, task content, or indexedDB contents.
 // It is a readiness report, not a security certification or a proof of offline behavior.
