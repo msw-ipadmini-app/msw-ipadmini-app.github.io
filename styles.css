@@ -586,3 +586,35 @@ body.msw-private { visibility: hidden !important; }
 #modal .basic-survey-date .basic-survey-date-clear:disabled{
   opacity:.45;cursor:default
 }
+
+/* BASIC-FIX1 — only the basic tab viewport is stationary. */
+#modal .sheetbody.basic-fixed-body{overflow-y:hidden;overscroll-behavior-y:none;padding:6px 10px calc(7px + env(safe-area-inset-bottom))}
+#modal .basic-fixed-body .basic-dashboard{display:grid;grid-template-columns:minmax(0,1.9fr) minmax(225px,1fr);grid-template-rows:auto minmax(0,1fr);gap:7px 10px;height:100%;min-height:0;overflow:hidden;align-items:stretch}
+#modal .basic-fixed-body .basic-dashboard.basic-layout-info{grid-template-columns:minmax(0,2.5fr) minmax(190px,.8fr)}
+#modal .basic-fixed-body .basic-dashboard.basic-layout-docs{grid-template-columns:minmax(0,1.6fr) minmax(245px,1.15fr)}
+#modal .basic-layout-switch{grid-column:1/-1;display:flex;align-items:center;justify-content:flex-end;gap:5px;min-height:30px;flex-wrap:nowrap}
+#modal .basic-layout-switch span{margin-right:auto;font-size:11px;color:var(--muted);font-weight:700}
+#modal .basic-layout-choice{background:#f0f7f5;border:1px solid #b8d2cb;border-radius:7px;color:#25534a;padding:5px 8px;min-height:29px;font-size:11px;font-weight:700;white-space:nowrap}
+#modal .basic-layout-choice[aria-pressed="true"]{background:#0f766e;color:#fff;border-color:#0f766e}
+#modal .basic-fixed-body .basic-information{min-height:0;max-height:100%;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;padding:7px 8px}
+#modal .basic-fixed-body .basic-docs{min-height:0;max-height:100%;overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;align-content:start;gap:7px}
+#modal .basic-fixed-body .basic-form-rows{gap:clamp(3px,.7dvh,8px)}
+#modal .basic-fixed-body .basic-r5 textarea{height:clamp(48px,7dvh,70px);min-height:46px}
+#modal .basic-fixed-body .basic-r7 textarea{height:clamp(48px,7dvh,67px);min-height:46px}
+#modal .basic-fixed-body .basic-gen-preview{height:clamp(138px,24dvh,218px)}
+#modal .basic-fixed-body .basic-photo-card,#modal .basic-fixed-body .basic-admission-card{padding:7px 8px}
+#modal .basic-fixed-body .basic-card-title{margin-bottom:4px}
+#modal .basic-fixed-body .basic-admission-open{min-height:55px;padding:7px}
+#modal .basic-fixed-body .basic-santherese{padding:7px 8px}
+#modal .sheetbody.basic-fixed-body:focus-within{overflow-y:auto}
+@media(max-width:690px){
+ #modal .sheetbody.basic-fixed-body{overflow-y:auto}
+ #modal .basic-fixed-body .basic-dashboard{height:auto;min-height:100%;overflow:visible;display:flex;flex-direction:column}
+ #modal .basic-fixed-body .basic-information,#modal .basic-fixed-body .basic-docs{overflow:visible;max-height:none}
+ #modal .basic-layout-switch{justify-content:flex-start;flex-wrap:wrap}
+}
+#modal .basic-r4{grid-template-columns:minmax(0,145px) minmax(0,1fr)}
+#modal .basic-survey-date .basic-survey-date-line{display:flex;align-items:center;gap:4px;min-width:0}
+#modal .basic-survey-date .basic-survey-date-line input[type="date"]{flex:1 1 auto;width:0;min-width:0;min-height:35px;padding:5px 2px;font-size:11px}
+#modal .basic-survey-date .basic-survey-date-line .basic-survey-date-clear{flex:none;min-height:35px;padding:4px 5px;font-size:10px;white-space:nowrap}
+@media(max-width:810px){#modal .basic-r4{grid-template-columns:minmax(0,135px) minmax(0,1fr)}}

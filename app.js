@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC7-ST6';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTERCITY1';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -730,7 +730,7 @@ function renderPatientModal(){
 }
 function closePatient(){clearPatientAutoTimer();clearBasicPhotoPreview();dismissPhotoViewer();selectedPatient=null;$('#modal')?.remove();if(key&&state&&$('#main'))render()}
 function renderTab(){const root=$('#tabbody'),p=selectedPatient;if(activeTab==='photos'){renderPhotosTab();return;}if(activeTab==='basic'){renderBasicDashboard();return;}if(groups[activeTab]){root.innerHTML=`<div class="panel"><div class="form-grid">${groups[activeTab].map(fieldHtml).join('')}</div></div>`;bindMasterSelects(root);return}if(activeTab==='support'){root.innerHTML=`<div class="panel"><h3>退院支援</h3><div class="form-grid"><div class="field"><label>進捗ステータス</label>${masterSelectHtml('進捗ステータス',getStatus(p),'id="status"')}</div><div class="field"><label>退院日</label><input type="date" id="dischargeDate" value="${esc(p.dischargeDate||'')}"></div><div class="field span2"><label>退院支援メモ</label><textarea data-field="退院支援">${esc(p.data['退院支援']||'')}</textarea></div></div></div><div class="panel"><h3>要対応タスク</h3><div id="taskList">${taskListHtml(p)}</div><label class="mvp-task-label">対応内容<input id="newTask" maxlength="300" placeholder="例：家族に連絡、施設へ確認"></label><div class="mvp-task-options"><label>対応期限（任意）<input type="date" id="newTaskDue"></label><label class="mvp-urgent"><input type="checkbox" id="newTaskUrgent"> 優先対応</label><button class="btn" id="addTask">＋ タスク追加</button></div><p class="notice">期限を空欄にしたタスクも「要対応」一覧に残ります。</p></div><div class="panel"><button class="btn danger" id="dischargeNow">退院として登録</button><p class="notice">退院患者の情報は自動削除されず、退院患者記録に保持されます。</p></div>`;$('#addTask').onclick=addTask;$('#dischargeNow').onclick=()=>{if(!$('#dischargeDate').value)$('#dischargeDate').value=new Date().toISOString().slice(0,10);$('#status').value='退院先決定';};bindTaskChecks();bindMasterSelects(root);return}if(activeTab==='notes'){root.innerHTML=`<div class="panel"><h3>経過記録を追加</h3><p class="notice">${esc(DATA_MINIMIZATION_NOTICE)}</p><div class="form-grid"><div class="field"><label>種別</label>${masterSelectHtml('経過記録種別','面談','id="noteType"')}</div><div class="field"><label>日時</label><input id="noteAt" type="datetime-local" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}"></div><div class="field span2"><label>内容</label><textarea id="noteText" placeholder="対応内容・決定事項・次にやること"></textarea></div></div><button class="btn" id="addNote">記録追加</button><p id="noteSaveState" class="notice" role="status" aria-live="polite"></p></div><div class="panel"><h3>時系列</h3><div class="timeline">${notesHtml(p)}</div></div>`;$('#addNote').onclick=addNote;bindMasterSelects(root);return}}
-// BASIC7-ST1: the confirmed seven-row iPad mini layout; keep original field keys
+// Seven rows are provisional, not a fixed requirement; keep original field keys
 // (家構, 入院元, 介護度 etc.) so FileMaker mapping and existing records still work.
 // Municipality is a new, distinct city/town/village field. No street address is copied.
 function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
@@ -744,7 +744,7 @@ function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
   const numeric=field==='ＩＤ'?' inputmode="numeric" autocomplete="off"':'';
   const limited=field==='市町村'?' maxlength="30"':'';
   const control=`<input type="${type}" ${common}${numeric}${limited} value="${esc(v)}">`;
-  if(field==='調査日')return `<div class="field basic-field basic-survey-date"><div class="basic-survey-date-header"><label>${esc(label)}</label><button type="button" id="basicSurveyDateClear" class="basic-survey-date-clear" aria-label="この患者の介護調査日を消去">日付を消去</button></div>${control}</div>`;
+  if(field==='調査日')return `<div class="field basic-field basic-survey-date"><label>${esc(label)}</label><div class="basic-survey-date-line">${control}<button type="button" id="basicSurveyDateClear" class="basic-survey-date-clear" aria-label="この患者の介護調査日を消去">日付を消去</button></div></div>`;
   if(!['市町村','主治医','介護度'].includes(field))return `<div class="field basic-field"><label>${esc(label)}</label>${control}</div>`;
   return `<div class="field basic-field basic-combo" data-basic-combo="${esc(field)}"><label>${esc(label)}</label><div class="basic-combo-input">${control}<button type="button" class="basic-combo-arrow" data-combo-open="${esc(field)}" aria-label="${esc(label)}の候補を開く">▾</button></div></div>`;
 }
@@ -753,7 +753,7 @@ function bindBasicComboInputs(root){
   // the small left column. This avoids overlap and clipping on iPad mini.
   const boxes=[...root.querySelectorAll('[data-basic-combo]')];
   let overlay=null;
-  const cityValid=value=>/^[^0-9０-９@/\\:;〒]{1,30}(?:市|区|町|村)$/u.test(String(value).trim())&&!/丁目|番地|[0-9]+号/.test(String(value));
+  const cityValid=validMunicipalityCandidate;
   function close(){if(overlay){overlay.remove();overlay=null}}
   function show(box){
     const modal=document.getElementById('modal');
@@ -796,16 +796,20 @@ function bindBasicComboInputs(root){
       const n=input.value.length;try{input.setSelectionRange(n,n)}catch(_){}
     };
     overlay.querySelector('.basic-candidate-save').onclick=async e=>{
-      const value=input.value.trim();
-      if(!value){error.textContent='先に「自由入力する」で文字を入力してください。';return}
-      if(field==='市町村'&&!cityValid(value)){error.textContent='市町村名のみ登録できます。番地や数字は登録しないでください。';return}
+      // In the candidate dialog the search box, not the patient field,
+      // may hold a brand-new city name.
+      const value=String(search.value.trim()||input.value.trim()).normalize('NFKC');
+      if(!value){error.textContent='候補の検索欄に新しい市町村名を入力してください。';return}
+      if(field==='市町村'&&!cityValid(value)){error.textContent='市・区・町・村で終わる市町村名のみ登録できます。住所・番地は登録しないでください。';return}
       const prev=[...(state.masters?.[field]||[])];
-      if(prev.includes(value)){close();return}
+      if(masterValues(field).includes(value)){error.textContent='すでに登録されています。候補から選択してください。';paint(search.value);return}
       const btn=e.currentTarget;btn.disabled=true;
       try{
         await dataWriteTail;
         state.masters[field]=uniq([...prev,value]);
-        await save();close();
+        await save();
+        error.textContent='「'+value+'」を候補に登録しました。候補一覧から選択すると患者情報に反映されます。';
+        search.value=value;paint(search.value);
       }catch(err){state.masters[field]=prev;error.textContent='候補を保存できませんでした：'+String(err.message||err)}
       finally{if(btn.isConnected)btn.disabled=false}
     };
@@ -886,9 +890,15 @@ function bindSurveyDateClear(root){
     }
   };
 }
+let basicLayoutMode='balanced'; // Display-only session preference.
 function renderBasicDashboard(){
   const root=$('#tabbody');
-  root.innerHTML=`<div class="basic-dashboard">
+  root.classList.add('basic-fixed-body');
+  root.innerHTML=`<div class="basic-dashboard ${basicLayoutMode==='info'?'basic-layout-info':basicLayoutMode==='docs'?'basic-layout-docs':'basic-layout-balanced'}">
+    <div class="basic-layout-switch" role="group" aria-label="基本タブの表示幅を切り替え">
+      <span>画面固定</span>
+      ${[['balanced','標準'],['info','情報を広く'],['docs','書類を広く']].map(([mode,label])=>`<button type="button" class="basic-layout-choice" data-basic-layout="${mode}" aria-pressed="${basicLayoutMode===mode}">${label}</button>`).join('')}
+    </div>
     <section class="basic-information" aria-label="患者基本情報">
       <div class="basic-form-rows">
         <div class="basic-row basic-r1">${basicFieldHtml('ベッド番号','ベッド番号')}${basicFieldHtml('入院日','入院日')}${basicFieldHtml('入院日数','入院日数')}</div>
@@ -906,6 +916,15 @@ function renderBasicDashboard(){
     </section>
     ${basicDocumentHtml()}
   </div>`;
+  root.querySelectorAll('[data-basic-layout]').forEach(button=>button.onclick=()=>{
+    const mode=button.dataset.basicLayout;
+    if(!['balanced','info','docs'].includes(mode))return;
+    basicLayoutMode=mode;
+    const dash=root.querySelector('.basic-dashboard');if(!dash)return;
+    dash.classList.remove('basic-layout-balanced','basic-layout-info','basic-layout-docs');
+    dash.classList.add(mode==='info'?'basic-layout-info':mode==='docs'?'basic-layout-docs':'basic-layout-balanced');
+    root.querySelectorAll('[data-basic-layout]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.basicLayout===mode)));
+  });
   bindPatientBedPicker();
   bindMasterSelects(root);
   bindBasicComboInputs(root);
@@ -1465,13 +1484,23 @@ function renderTasks(){
 function renderDrugs(){const ds=state.drugs||[];$('#main').innerHTML=`<div class="hero"><div><h1>薬情</h1><p>端末内の簡易薬剤マスター。患者処方そのものは保存しません。</p></div></div><div class="toolbar"><input id="dq" placeholder="薬名・分類・薬効で検索"></div><div id="drugList"></div>`;$('#dq').oninput=drawDrugs;drawDrugs()}
 function drawDrugs(){const q=($('#dq')?.value||'').toLowerCase().trim();const a=(state.drugs||[]).filter(d=>!q||[d['薬名'],d['医薬品分類'],d['薬効']].join(' ').toLowerCase().includes(q)).slice(0,100);$('#drugList').innerHTML=a.length?`<div class="drug-list">${a.map(d=>`<article class="drug"><b>${esc(d['薬名'])}</b><div class="small">${esc(d['医薬品分類'])}　${esc(d['薬価'])}</div><div class="effect">${esc(d['薬効'])}</div></article>`).join('')}</div>`:'<div class="empty">薬剤データがありません。設定から「薬剤CSV」を読み込んでください。</div>'}
 
+// City/town/village only. Exclude addresses and labels.
+function validMunicipalityCandidate(value){
+ const text=String(value??'').trim().normalize('NFKC');
+ return text.length>=2&&text.length<=30&&text!=='市町村'
+   &&/^[^0-9@/\\:;〒]+(?:市|区|町|村)$/u.test(text)
+   &&!/丁目|番地|地番|[0-9]+号|郵便|電話|住所/.test(text);
+}
 function renderMasters(){
   ensureStateSchema();
   const fields=['進捗ステータス','経過記録種別',...masterFields];
   $('#main').innerHTML=`<div class="hero"><div><h1>マスター管理</h1><p>入力候補を管理します。介護度・住所（市町村）・主治医は↑↓で並び替えできます。</p></div></div>
   <div class="panel"><div class="form-grid"><div class="field span2"><label>編集する項目</label><select id="mf">${fields.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div></div></div>
-  <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" placeholder="新しい候補を入力"><button class="btn" id="addMaster">＋追加</button></div><div id="masterList"></div></div>`;
-  $('#mf').onchange=drawMasterList; $('#addMaster').onclick=addMasterFromScreen; $('#newMaster').onkeydown=e=>{if(e.key==='Enter')addMasterFromScreen()}; drawMasterList();
+  <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" autocomplete="off" placeholder="新しい候補を入力"><button class="btn" id="addMaster">＋追加</button></div><p id="masterAddStatus" class="notice" role="status" aria-live="polite"></p><div id="masterList"></div></div>`;
+  $('#mf').onchange=()=>{$('#masterAddStatus').textContent='';drawMasterList()};
+  $('#addMaster').onclick=addMasterFromScreen;
+  $('#newMaster').onkeydown=e=>{if(e.key==='Enter'&&!e.isComposing&&e.keyCode!==229){e.preventDefault();void addMasterFromScreen()}};
+  drawMasterList();
 }
 // Some dropdown values are system defaults or are still used by patients.
 // Deleting them here would appear to succeed, then silently recreate them
@@ -1548,14 +1577,21 @@ function drawMasterList(){
  });
 }
 async function addMasterFromScreen(){
-  const input=$('#newMaster'),btn=$('#addMaster'),f=$('#mf').value,v=input?.value.trim();
-  if(!v||!btn)return;
-  btn.disabled=true;
+  const input=$('#newMaster'),btn=$('#addMaster'),selector=$('#mf'),status=$('#masterAddStatus');
+  if(!input||!btn||!selector||!status)return;
+  const f=selector.value,v=String(input.value||'').trim().normalize('NFKC');
+  if(!v){status.textContent='追加する候補を入力してください。';return;}
+  if(f==='ベッド番号'){status.textContent='ベッド番号は固定されているため追加できません。';return;}
+  if(f==='市町村'&&!validMunicipalityCandidate(v)){
+    status.textContent='市・区・町・村で終わる市町村名のみ入力してください（例：石岡市）。番地・数字は登録できません。';return;
+  }
+  if(masterValues(f).includes(v)){status.textContent='「'+v+'」はすでに候補に登録されています。';return;}
+  btn.disabled=true;status.textContent='候補を暗号化保存しています…';
   try{
-    if(await commitMasterValues(f,[...(state.masters[f]||[]),v])){
-      if(input.isConnected)input.value='';
-      drawMasterList();
-    }
+    const saved=await commitMasterValues(f,[...(state.masters?.[f]||[]),v]);
+    if(!saved){status.textContent='登録できませんでした。保存エラーの表示を確認してください。';return;}
+    if(input.isConnected)input.value='';
+    if(selector.isConnected&&selector.value===f){drawMasterList();status.textContent='「'+v+'」を登録しました。患者情報の候補にも表示されます。';}
   }finally{if(btn.isConnected)btn.disabled=false;}
 }
 
