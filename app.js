@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02-NAVFIX1';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -690,7 +690,7 @@ async function finishPatientAndNavigate(next,{closing=false}={}){
   if(document.querySelector('#tabbody .patient-med-editor[data-med-dirty="1"]')&&
      !confirm('薬価・規格・数量に未保存の入力があります。保存せずに画面を移動しますか？'))return;
   patientTransitionBusy=true;
-  const controls=$('#modal .sheethead button, #modal .tab');
+  const controls=Array.from(document.querySelectorAll('#modal .sheethead button, #modal .tab'))
   controls.forEach(b=>b.disabled=true);
   try{
     capturePatientForm();
