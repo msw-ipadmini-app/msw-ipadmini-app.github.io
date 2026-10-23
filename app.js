@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTERCITY3';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTEREXPLICIT1';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -83,14 +83,18 @@ const defaultMasters={
   '睡眠':['良好','不良','不明'],
   'コール':['自立','使用可','使用困難','不明']
 };
+// Only a deliberate master registration may add values to these three
+// lists. A patient's text, OCR/CSV imported value or changed status must
+// not silently add a shared pick-list item.
+const EXPLICIT_ONLY_MASTER_FIELDS=new Set(['市町村','主治医','介護度']);
 function ensureStateSchema(target=state){
   if(!target)return;
   target.version=APP_VERSION;
   target.masters??={};
   for(const [k,vals] of Object.entries(defaultMasters)) target.masters[k]=uniq([...(target.masters[k]||[]),...vals]);
   for(const f of masterFields){
+    if(f==='ベッド番号'||EXPLICIT_ONLY_MASTER_FIELDS.has(f))continue;
     const fromPatients=(target.patients||[]).map(p=>String(p.data?.[f]??'').trim()).filter(Boolean);
-    if(f==='ベッド番号')continue; // Official 67 beds are independent of imported values.
     target.masters[f]=uniq([...(target.masters[f]||[]),...fromPatients]);
   }
 }
@@ -802,13 +806,13 @@ function bindBasicComboInputs(root){
       if(!value){error.textContent='候補の検索欄に新しい市町村名を入力してください。';return}
       if(field==='市町村'&&!cityValid(value)){error.textContent='「小美玉」など市町村の略称も登録できます。番地・数字・電話番号は登録しないでください。';return}
       const prev=[...(state.masters?.[field]||[])];
-      if(masterValues(field).includes(value)){error.textContent='すでに登録されています。候補から選択してください。';paint(search.value);return}
+      if(masterValues(field).includes(value)){error.textContent='すでに共通候補に登録されています。候補から選択してください。';paint(search.value);return}
       const btn=e.currentTarget;btn.disabled=true;
       try{
         await dataWriteTail;
         state.masters[field]=uniq([...prev,value]);
         await save();
-        error.textContent='「'+value+'」を候補に登録しました。候補一覧から選択すると患者情報に反映されます。';
+        error.textContent='「'+value+'」を固定の共通候補に登録しました。候補一覧から選択してください。';
         search.value=value;paint(search.value);
       }catch(err){state.masters[field]=prev;error.textContent='候補を保存できませんでした：'+String(err.message||err)}
       finally{if(btn.isConnected)btn.disabled=false}
@@ -1502,7 +1506,7 @@ function renderMasters(){
   const fields=['進捗ステータス','経過記録種別',...masterFields];
   $('#main').innerHTML=`<div class="hero"><div><h1>マスター管理</h1><p>入力候補を管理します。介護度・住所（市町村）・主治医は↑↓で並び替えできます。</p></div></div>
   <div class="panel"><div class="form-grid"><div class="field span2"><label>編集する項目</label><select id="mf">${fields.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div></div></div>
-  <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" autocomplete="off" placeholder="新しい候補を入力"><button type="button" class="btn" id="addMaster">＋追加</button></div><p id="masterAddStatus" class="notice master-add-status" role="status" aria-live="polite">登録先：市町村。小美玉など「市」を省いた略称も追加できます。</p><div id="masterList"></div></div>`;
+  <div class="panel"><h3 id="masterTitle"></h3><p id="masterManualPolicy" class="notice">主治医・市町村・介護度は、ここで登録した候補だけを今後の共通候補に追加します。患者情報の手入力は自動追加しません。以前の共通候補は残しています。</p><div class="toolbar"><input id="newMaster" autocomplete="off" placeholder="新しい候補を入力"><button type="button" class="btn" id="addMaster">＋追加</button></div><p id="masterAddStatus" class="notice master-add-status" role="status" aria-live="polite">登録先：市町村。小美玉など「市」を省いた略称も追加できます。</p><div id="masterList"></div></div>`;
   // Default to city master, and retain the operator's selected field during
   // this session. The selected field is shown directly beside add feedback.
   const selector=$('#mf'),entry=$('#newMaster'),button=$('#addMaster'),status=$('#masterAddStatus');
@@ -1524,6 +1528,10 @@ function renderMasters(){
 function masterValueIsProtected(field,value){
   if(field==='ベッド番号')return true; // Fixed official bed layout.
   if((defaultMasters[field]||[]).includes(value))return true;
+  // A legacy patient-typed value might already be in the master list.
+  // It can be removed from the global pick-list even while a patient uses it.
+  // The patient-specific field value is never deleted or rewritten.
+  if(EXPLICIT_ONLY_MASTER_FIELDS.has(field))return false;
   if(['進捗ステータス','経過記録種別'].includes(field))return false;
   return (state?.patients||[]).some(p=>String(p.data?.[field]??'').trim()===String(value));
 }
@@ -1584,7 +1592,7 @@ function drawMasterList(){
  host.querySelectorAll('.masterDel').forEach(btn=>btn.onclick=async()=>{
   const value=vals[Number(btn.dataset.i)];
   if(masterValueIsProtected(f,value)){drawMasterList();return;}
-  if(!confirm(`「${value}」をマスターから削除しますか？\n既存患者に入力済みの値は消えません。`))return;
+  if(!confirm(`「${value}」を共通の候補一覧から削除しますか？\n患者情報に入力済みの値はそのまま残ります。`))return;
   btn.disabled=true;
   try{
    const next=(state.masters[f]||[]).filter(x=>x!==value);
@@ -1615,7 +1623,7 @@ async function addMasterFromScreen(){
     }
     if(!state||!key){inform('アプリがロックされているため登録できません。');return;}
     if(masterValues(f).includes(v)){
-      inform('「'+v+'」はすでに「'+f+'」の候補に登録されています。下の一覧で確認してください。');
+      inform('「'+v+'」はすでに「'+f+'」の固定候補に登録されています。患者情報が変わっても候補は残ります。');
       return;
     }
     inform('「'+v+'」を「'+f+'」へ暗号化保存しています…');
@@ -1631,7 +1639,7 @@ async function addMasterFromScreen(){
     }
     if(selector.isConnected&&selector.value===f){
       drawMasterList();
-      inform('登録完了：「'+v+'」を「'+f+'」に保存し、再読み込みで確認できました。');
+      inform('固定候補に登録完了：「'+v+'」を「'+f+'」に保存し、再読み込みで確認できました。');
     }
     if(input.isConnected&&input.value===originalText)input.value='';
   }catch(error){
