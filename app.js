@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX01';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -687,8 +687,10 @@ async function finishPatientAndNavigate(next,{closing=false}={}){
   if(photoImportBusy||photoRotateBusy||photoDeleteBusy||photoReorderBusy||pdfExportBusy||noteWriteBusy||patientMedicationBusy){
     alert('写真・PDFの処理が終わってから画面を切り替えてください。');return;
   }
+  if(document.querySelector('#tabbody .patient-med-editor[data-med-dirty="1"]')&&
+     !confirm('薬価・規格・数量に未保存の入力があります。保存せずに画面を移動しますか？'))return;
   patientTransitionBusy=true;
-  const controls=$$('#modal .sheethead button, #modal .tab');
+  const controls=$('#modal .sheethead button, #modal .tab');
   controls.forEach(b=>b.disabled=true);
   try{
     capturePatientForm();
@@ -1497,38 +1499,146 @@ const MED_SNAPSHOT_FIELDS=['薬名','医薬品分類','薬価','薬効'];
 function medSnapshot(d){return Object.fromEntries(MED_SNAPSHOT_FIELDS.map(k=>[k,String(d?.[k]??'').trim()]))}
 function medSignature(d){return JSON.stringify(MED_SNAPSHOT_FIELDS.map(k=>String(d?.[k]??'').trim()))}
 function medRows(p){return Array.isArray(p?.medications)?p.medications:[]}
+
+const MED_UNITS=['','錠','カプセル','包','g','mL','本','枚','回','その他'];
+const MED_STATUSES=['','定期','頓服','中止','不明'];
+// Read only unambiguous "strength(price)" pairs; do not guess from mixed
+// units, combined labels, or historical unstructured cost strings.
+function medPriceChoices(text){
+ const s=String(text??'').normalize('NFKC').replace(/[\s\u000b　]+/g,'');
+ if(!s||s.length>650)return [];
+ const re=/([^()]+)\((\d{1,7}(?:\.\d{1,2})?)\)/g;
+ const out=[];let cursor=0,match;
+ while((match=re.exec(s))!==null){
+   if(match.index!==cursor)return [];
+   const strength=match[1],unitPrice=match[2],v=Number(unitPrice);
+   if(strength.length>45||!strength||/[、,，⇒=>]/.test(strength)||!Number.isFinite(v)||v<=0||v>1000000)return [];
+   out.push({strength,unitPrice});cursor=re.lastIndex;
+   if(out.length>15)return [];
+ }
+ if(cursor!==s.length)return [];
+ return out;
+}
+function medEffectAndGenerics(drug){
+ const source=String(drug?.['薬効']??'').replace(/\r/g,'').replace(/\u000b/g,'\n');
+ const marker=source.match(/後発(?:医薬)?品?\s*[⇒=>:：]\s*([^\n]+)/);
+ const generic=marker?marker[1].trim():'';
+ const effect=(marker?source.replace(marker[0],''):source).trim().replace(/\n{3,}/g,'\n\n');
+ return{effect,generic};
+}
+function medPriceInfo(record){
+ const p=record?.pricing||{};
+ if(p.status!=='定期')return null;
+ const priceText=String(p.unitPrice??'').trim(),qtyText=String(p.dailyQuantity??'').trim();
+ const price=Number(priceText),qty=Number(qtyText);
+ if(!p.strength||!MED_UNITS.includes(p.unit)||!p.unit||!priceText||!qtyText||
+    !/^\d{1,7}(?:\.\d{1,2})?$/.test(priceText)||
+    !/^\d{1,4}(?:\.\d{1,3})?$/.test(qtyText)||
+    !Number.isFinite(price)||!Number.isFinite(qty)||price<=0||qty<=0||
+    price>1000000||qty>1000||price*qty>10000000)return null;
+ return Math.round(Math.round(price*100)*qty)/100;
+}
+function medMoney(number){return Number(number).toLocaleString('ja-JP',{minimumFractionDigits:2,maximumFractionDigits:2})+'円'}
+function medReferenceSummary(rows){
+ const regular=rows.filter(r=>r?.pricing?.status==='定期');
+ const costs=regular.map(medPriceInfo);
+ const known=costs.filter(v=>v!==null);
+ const sum=Math.round(known.reduce((total,n)=>total+n,0)*100)/100;
+ return {regular:regular.length,known:known.length,pending:regular.length-known.length,sum};
+}
 function renderPatientMedications(){
-  const root=$('#tabbody');
-  root.innerHTML=`<div class="patient-med-page">
-    <section class="panel"><h3>処方薬（確認用）</h3>
-      <p class="notice">電子カルテ・処方箋を確認する際の補助一覧です。正式な処方・服薬の記録ではありません。分類・薬価・薬効は登録当時の情報であり、最新とは限りません。</p>
-      <p id="patientMedStatus" class="patient-med-status" role="status" aria-live="polite">薬を検索して一覧に追加できます。</p>
-      <h4>この患者の登録薬　<span id="patientMedCount"></span></h4><div id="patientMedList"></div>
-    </section>
-    <section class="panel"><h3>＋ 薬剤マスターから追加</h3>
-      <label class="patient-med-query-label">薬名・分類・薬効で検索
-        <input type="search" id="patientDrugQuery" autocomplete="off" placeholder="例：メネシット">
-      </label><div id="patientDrugResults"></div>
-    </section></div>`;
-  root.querySelector('#patientDrugQuery').oninput=drawPatientDrugResults;
-  drawPatientMedicationList();drawPatientDrugResults();
+ const root=$('#tabbody');
+ root.innerHTML=`<div class="patient-med-page">
+   <section class="panel"><h3>処方薬一覧（確認用）</h3>
+    <p class="notice">薬効・後発品はFileMaker由来の登録内容で、現在の添付文書・薬価とは限りません。正式な処方・服薬の記録ではありません。</p>
+    <div id="patientMedSummary" class="patient-med-summary" role="status" aria-live="polite"></div>
+    <p class="notice">参考日額＝確認した単価 × 1日数量。定期薬のみ集計し、未設定分は除外します。実際の請求額ではありません。</p>
+    <p id="patientMedStatus" class="patient-med-status" role="status" aria-live="polite">薬名と薬効・後発品・薬価を一覧で確認できます。</p>
+    <h4>この患者の登録薬　<span id="patientMedCount"></span></h4><div id="patientMedList"></div>
+   </section>
+   <section class="panel"><h3>＋ 薬剤マスターから追加</h3>
+    <label class="patient-med-query-label">薬名・分類・薬効で検索
+     <input type="search" id="patientDrugQuery" autocomplete="off" placeholder="例：メネシット">
+    </label><div id="patientDrugResults"></div>
+   </section>
+ </div>`;
+ root.querySelector('#patientDrugQuery').oninput=drawPatientDrugResults;
+ drawPatientMedicationList();drawPatientDrugResults();
 }
 function drawPatientMedicationList(){
-  const patient=selectedPatient,host=$('#patientMedList'),count=$('#patientMedCount');
-  if(!patient||!host||!count)return;
-  const rows=medRows(patient);count.textContent=String(rows.length)+'件';
-  if(!rows.length){host.innerHTML='<p class="empty">登録薬はありません。下の検索から追加してください。</p>';return;}
-  host.innerHTML=rows.map(item=>{
-    const d=item.drug||{},details=MED_SNAPSHOT_FIELDS.filter(k=>k!=='薬名').map(k=>
-      `<div class="patient-med-fact"><dt>${esc(k)}</dt><dd>${esc(d[k]||'未登録')}</dd></div>`).join('');
-    return `<article class="patient-med-row"><div class="patient-med-line"><div><strong>${esc(d['薬名']||'名称未登録')}</strong>
-      <div class="notice">登録：${esc(String(item.addedAt||'').slice(0,10)||'不明')}</div></div>
-      <button type="button" class="btn danger patient-med-del" data-id="${esc(item.id)}">一覧から削除</button></div>
-      <details><summary>薬効・分類・薬価を見る</summary><dl>${details}</dl>
-        <p class="notice">これは登録時の薬剤マスターの写しです。最新の薬剤情報は医療機関の資料で確認してください。</p>
-      </details></article>`;
-  }).join('');
-  host.querySelectorAll('.patient-med-del').forEach(btn=>btn.onclick=()=>{void changePatientMedication('delete',btn.dataset.id)});
+ const patient=selectedPatient,host=$('#patientMedList'),count=$('#patientMedCount'),summary=$('#patientMedSummary');
+ if(!patient||!host||!count||!summary)return;
+ const rows=medRows(patient);count.textContent=String(rows.length)+'件';
+ const s=medReferenceSummary(rows);
+ const sumText=s.known?(s.pending?'定期薬の参考日額・小計':'定期薬の参考日額・合計')+'：'+medMoney(s.sum):'定期薬の参考日額：—（計算待ち）';
+ summary.innerHTML=`<strong>${esc(sumText)}</strong><span>計算可能 ${s.known}/${s.regular}件</span>`+
+  (s.pending?`<small>未計算の定期薬が${s.pending}件あるため、全薬剤の合計ではありません。</small>`:'' );
+ if(!rows.length){host.innerHTML='<p class="empty">登録薬はありません。下の検索から追加してください。</p>';return;}
+ host.innerHTML=rows.map(item=>{
+   const d=item.drug||{},p=item.pricing||{},text=medEffectAndGenerics(d),cost=medPriceInfo(item);
+   const status=p.status||'未設定',strength=p.strength||'規格未設定';
+   const currentPrice=p.unitPrice?medMoney(Number(p.unitPrice))+(p.unit?'／'+p.unit:'（単位未確認）'):'薬価未設定';
+   const costText=cost===null?(p.status==='定期'?'参考日額：計算待ち':'参考日額：対象外'):'参考日額：'+medMoney(cost);
+   const options=medPriceChoices(d['薬価']);
+   const optionHtml=options.length?`<label>旧データから規格・薬価を選択（内容を確認）<select class="patient-med-choice"><option value="">候補から選ぶ（任意）</option>${
+      options.map((v,i)=>`<option value="${i}">${esc(v.strength)} ／ ${esc(v.unitPrice)}円</option>`).join('')
+    }</select></label>`:'<p class="notice">元の薬価から規格別価格を安全に抽出できません。価格は手動で確認してください。</p>';
+   return `<article class="patient-med-row">
+     <div class="patient-med-line"><div><strong>${esc(d['薬名']||'名称未登録')}</strong>
+       <div class="notice">${esc(d['医薬品分類']||'分類未登録')}　・　${esc(status)}</div></div>
+       <button type="button" class="btn danger patient-med-del" data-id="${esc(item.id)}">一覧から削除</button></div>
+     <div class="patient-med-glance">
+       <div><b>薬効</b><span class="patient-med-glance-effect">${esc(text.effect||'未登録')}</span></div>
+       <div><b>後発品</b><span>${esc(text.generic||'登録情報なし')}</span></div>
+       <div><b>薬価</b><span>${esc(strength)}　${esc(currentPrice)}　／　${esc(costText)}</span></div>
+     </div>
+     <details class="patient-med-editor" data-id="${esc(item.id)}" data-med-dirty="0">
+       <summary>規格・薬価・1日量を設定 / 全文を見る</summary>
+       <div class="patient-med-editor-body">
+         <div class="patient-med-fact"><dt>薬効（全文）</dt><dd>${esc(text.effect||'未登録')}</dd></div>
+         <div class="patient-med-fact"><dt>後発品（登録情報）</dt><dd>${esc(text.generic||'未登録')}</dd></div>
+         <div class="patient-med-fact"><dt>薬価の元データ</dt><dd>${esc(d['薬価']||'未登録')}</dd></div>
+         <p class="notice">価格・規格は古い可能性があります。CSVから候補を選んでも、単価の対象単位と1日数量は必ず確認してください。</p>
+         ${optionHtml}
+         <div class="patient-med-fields">
+          <label>規格<input class="patient-med-strength" maxlength="60" value="${esc(p.strength||'')}" placeholder="例：100mg"></label>
+          <label>参考単価（円）<input class="patient-med-unit-price" inputmode="decimal" maxlength="14" value="${esc(p.unitPrice||'')}" placeholder="例：34.30"></label>
+          <label>単価の単位<select class="patient-med-unit">${MED_UNITS.map(u=>`<option value="${esc(u)}" ${p.unit===u?'selected':''}>${esc(u||'単位を選択')}</option>`).join('')}</select></label>
+          <label>1日合計数量<input class="patient-med-daily" inputmode="decimal" maxlength="12" value="${esc(p.dailyQuantity||'')}" placeholder="例：3"></label>
+          <label>区分<select class="patient-med-status-choice">${MED_STATUSES.map(u=>`<option value="${esc(u)}" ${p.status===u?'selected':''}>${esc(u||'未確認')}</option>`).join('')}</select></label>
+         </div>
+         <p class="notice">例：1錠34.30円、1日3錠の定期薬なら102.90円／日。頓服・中止・不明は参考日額に含めません。入力後は保存を押してください。</p>
+         <button type="button" class="btn patient-med-pricing-save">薬価設定を保存</button>
+         <p class="patient-med-entry-state notice" role="status" aria-live="polite"></p>
+       </div></details>
+     </article>`;
+ }).join('');
+ host.querySelectorAll('.patient-med-del').forEach(btn=>btn.onclick=()=>{void changePatientMedication('delete',btn.dataset.id)});
+ host.querySelectorAll('.patient-med-editor').forEach(editor=>{
+   const options=medPriceChoices(medRows(patient).find(r=>r.id===editor.dataset.id)?.drug?.['薬価']);
+   const mark=()=>{editor.dataset.medDirty='1';const message=editor.querySelector('.patient-med-entry-state');if(message)message.textContent='未保存の変更があります。';};
+   editor.querySelectorAll('input,select').forEach(input=>{input.addEventListener('input',mark);input.addEventListener('change',mark)});
+   const selector=editor.querySelector('.patient-med-choice');
+   if(selector)selector.onchange=()=>{
+     if(selector.value==='')return;
+     const picked=options[Number(selector.value)];if(!picked)return;
+     const prevStrength=editor.querySelector('.patient-med-strength').value;
+     editor.querySelector('.patient-med-strength').value=picked.strength;
+     editor.querySelector('.patient-med-unit-price').value=picked.unitPrice;
+     if(prevStrength!==picked.strength){
+       editor.querySelector('.patient-med-unit').value='';
+       editor.querySelector('.patient-med-daily').value='';
+     }
+     mark();
+   };
+   editor.querySelector('.patient-med-pricing-save').onclick=()=>{
+      const val=k=>editor.querySelector(k).value.trim();
+      void changePatientMedication('pricing',{id:editor.dataset.id,pricing:{
+         strength:val('.patient-med-strength'),unitPrice:val('.patient-med-unit-price'),
+         unit:val('.patient-med-unit'),dailyQuantity:val('.patient-med-daily'),
+         status:val('.patient-med-status-choice')}});
+   };
+ });
 }
 function drawPatientDrugResults(){
   const search=$('#patientDrugQuery'),host=$('#patientDrugResults');
@@ -1559,6 +1669,24 @@ async function changePatientMedication(action,ident){
     if(prev.some(r=>medSignature(r?.drug)===medSignature(item))){inform('同じ薬剤情報はすでに登録されています。');return;}
     if(prev.length>=100){inform('一人の患者には100件まで登録できます。');return;}
     next=[...prev,{id:uid(),drug:item,addedAt:nowISO()}];
+  }else if(action==='pricing'){
+    const row=prev.find(x=>x.id===ident?.id);
+    if(!row){inform('対象の登録薬が見つかりません。');return;}
+    const value=ident.pricing||{};
+    const strength=String(value.strength||'').trim(),unitPrice=String(value.unitPrice||'').trim();
+    const dailyQuantity=String(value.dailyQuantity||'').trim(),unit=String(value.unit||''),status=String(value.status||'');
+    if(strength.length>60||!MED_UNITS.includes(unit)||!MED_STATUSES.includes(status)||
+      (unitPrice&&(!/^\d{1,7}(?:\.\d{1,2})?$/.test(unitPrice)||Number(unitPrice)<=0||Number(unitPrice)>1000000))||
+      (dailyQuantity&&(!/^\d{1,4}(?:\.\d{1,3})?$/.test(dailyQuantity)||Number(dailyQuantity)<=0||Number(dailyQuantity)>1000))){
+       const message='金額は正の数で小数2桁まで、1日数量は正の数で小数3桁まで入力してください。';
+       inform(message);const local=document.querySelector('#tabbody .patient-med-editor[data-id="'+row.id+'"] .patient-med-entry-state');if(local)local.textContent=message;
+       return;
+    }
+    if(unitPrice&&dailyQuantity&&Number(unitPrice)*Number(dailyQuantity)>10000000){
+      inform('1日参考額が大きすぎるため保存できません。単位と数量を確認してください。');return;
+    }
+    const pricing={strength,unitPrice,unit,dailyQuantity,status};
+    next=prev.map(x=>x.id===row.id?{...x,pricing}:x);
   }else if(action==='delete'){
     const existing=prev.find(x=>x.id===ident);
     if(!existing){inform('対象が見つかりません。');return;}
@@ -1573,7 +1701,7 @@ async function changePatientMedication(action,ident){
   try{
     if(selectedPatient!==patient||!key||!state)throw new Error('患者またはロック状態が変わりました。');
     await save();
-    if(selectedPatient===patient){drawPatientMedicationList();inform(action==='add'?'登録しました。薬名の下から情報を確認できます。':'患者の一覧から削除しました。');}
+    if(selectedPatient===patient){drawPatientMedicationList();inform(action==='add'?'登録しました。薬名と薬効・後発品を一覧で確認できます。':action==='pricing'?'規格・参考薬価・1日数量を保存しました。':'患者の一覧から削除しました。');}
   }catch(e){
     patient.medications=prev;
     if(selectedPatient===patient){drawPatientMedicationList();inform('保存失敗のため元に戻しました：'+String(e.message||e).slice(0,120));}
