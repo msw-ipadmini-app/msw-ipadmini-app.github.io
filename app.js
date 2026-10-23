@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTERCITY2';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTERCITY3';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -737,7 +737,7 @@ function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
   const p=selectedPatient,v=p.data?.[field]??'';
   if(field==='ベッド番号')return `<div class="field basic-field"><label>ベッド番号</label><input type="hidden" data-field="ベッド番号" id="patientBedValue" value="${esc(v)}"><button type="button" class="btn secondary basic-bed-picker" id="patientBedPick">${esc(v||'その他・未配置')} ▾</button></div>`;
   if(field==='入院日数')return `<div class="field basic-field"><label>入院日数（自動）</label><div id="basicAdmissionDays" class="basic-readonly" aria-live="polite">${esc(daysSince(p.data['入院日'])||p.data['入院日数']||'—')}${daysSince(p.data['入院日'])||p.data['入院日数']?'日':''}</div></div>`;
-  const placeholder=field==='家構'?'例：2同別':field==='市町村'?'例：水戸市（番地は入力しない）':field==='介護情報'?'ケアマネ・介護サービスなど':'';
+  const placeholder=field==='家構'?'例：2同別':field==='市町村'?'例：小美玉（市町村名の略称可・番地不可）':field==='介護情報'?'ケアマネ・介護サービスなど':'';
   const common=`data-field="${esc(field)}" aria-label="${esc(label)}" placeholder="${esc(placeholder)}"`;
   if(multiline)return `<div class="field basic-field"><label>${esc(label)}</label><textarea ${common} rows="${rows}">${esc(v)}</textarea></div>`;
   const type=(field==='入院日'||field==='調査日')?'date':'text';
@@ -800,7 +800,7 @@ function bindBasicComboInputs(root){
       // may hold a brand-new city name.
       const value=String(search.value.trim()||input.value.trim()).normalize('NFKC');
       if(!value){error.textContent='候補の検索欄に新しい市町村名を入力してください。';return}
-      if(field==='市町村'&&!cityValid(value)){error.textContent='市・区・町・村で終わる市町村名のみ登録できます。住所・番地は登録しないでください。';return}
+      if(field==='市町村'&&!cityValid(value)){error.textContent='「小美玉」など市町村の略称も登録できます。番地・数字・電話番号は登録しないでください。';return}
       const prev=[...(state.masters?.[field]||[])];
       if(masterValues(field).includes(value)){error.textContent='すでに登録されています。候補から選択してください。';paint(search.value);return}
       const btn=e.currentTarget;btn.disabled=true;
@@ -1485,11 +1485,16 @@ function renderDrugs(){const ds=state.drugs||[];$('#main').innerHTML=`<div class
 function drawDrugs(){const q=($('#dq')?.value||'').toLowerCase().trim();const a=(state.drugs||[]).filter(d=>!q||[d['薬名'],d['医薬品分類'],d['薬効']].join(' ').toLowerCase().includes(q)).slice(0,100);$('#drugList').innerHTML=a.length?`<div class="drug-list">${a.map(d=>`<article class="drug"><b>${esc(d['薬名'])}</b><div class="small">${esc(d['医薬品分類'])}　${esc(d['薬価'])}</div><div class="effect">${esc(d['薬効'])}</div></article>`).join('')}</div>`:'<div class="empty">薬剤データがありません。設定から「薬剤CSV」を読み込んでください。</div>'}
 
 // City/town/village only. Exclude addresses and labels.
+// Staff deliberately enter concise municipality labels for the small iPad
+// viewport and printed forms (e.g. 小美玉 instead of 小美玉市).
+// Never force a suffix. Restrict to Japanese characters only to avoid storing
+// numbers, apartment addresses and contact details in this structured field.
+// This is a format check, not an official-municipality dictionary.
 function validMunicipalityCandidate(value){
  const text=String(value??'').trim().normalize('NFKC');
- return text.length>=2&&text.length<=30&&text!=='市町村'
-   &&/^[^0-9@/\\:;〒]+(?:市|区|町|村)$/u.test(text)
-   &&!/丁目|番地|地番|[0-9]+号|郵便|電話|住所/.test(text);
+ return text.length>=1&&text.length<=30&&text!=='市町村'
+   &&/^[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}ー・]+$/u.test(text)
+   &&!/丁目|番地|地番|号室|住居|郵便|電話|住所|連絡先/.test(text);
 }
 let masterSelectedField='市町村';
 function renderMasters(){
@@ -1497,15 +1502,15 @@ function renderMasters(){
   const fields=['進捗ステータス','経過記録種別',...masterFields];
   $('#main').innerHTML=`<div class="hero"><div><h1>マスター管理</h1><p>入力候補を管理します。介護度・住所（市町村）・主治医は↑↓で並び替えできます。</p></div></div>
   <div class="panel"><div class="form-grid"><div class="field span2"><label>編集する項目</label><select id="mf">${fields.map(f=>`<option>${esc(f)}</option>`).join('')}</select></div></div></div>
-  <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" autocomplete="off" placeholder="新しい候補を入力"><button type="button" class="btn" id="addMaster">＋追加</button></div><p id="masterAddStatus" class="notice master-add-status" role="status" aria-live="polite">登録先：市町村。候補を入力して「＋追加」を押してください。</p><div id="masterList"></div></div>`;
+  <div class="panel"><h3 id="masterTitle"></h3><div class="toolbar"><input id="newMaster" autocomplete="off" placeholder="新しい候補を入力"><button type="button" class="btn" id="addMaster">＋追加</button></div><p id="masterAddStatus" class="notice master-add-status" role="status" aria-live="polite">登録先：市町村。小美玉など「市」を省いた略称も追加できます。</p><div id="masterList"></div></div>`;
   // Default to city master, and retain the operator's selected field during
   // this session. The selected field is shown directly beside add feedback.
   const selector=$('#mf'),entry=$('#newMaster'),button=$('#addMaster'),status=$('#masterAddStatus');
   selector.value=fields.includes(masterSelectedField)?masterSelectedField:'市町村';
   const syncTarget=()=>{
     masterSelectedField=selector.value;
-    entry.placeholder=masterSelectedField==='市町村'?'例：石岡市':'「'+masterSelectedField+'」の新しい候補';
-    status.textContent='登録先：'+masterSelectedField+'。新しい候補を入力して「＋追加」を押してください。';
+    entry.placeholder=masterSelectedField==='市町村'?'例：小美玉（市町村の略称OK）':'「'+masterSelectedField+'」の新しい候補';
+    status.textContent=masterSelectedField==='市町村'?'登録先：市町村。「小美玉」「小美玉市」どちらも登録できます。':'登録先：'+masterSelectedField+'。新しい候補を入力して「＋追加」を押してください。';
     drawMasterList();
   };
   selector.onchange=syncTarget;
@@ -1605,7 +1610,7 @@ async function addMasterFromScreen(){
     if(!v){inform('登録する候補が空欄です。文字を入力してください。');return;}
     if(f==='ベッド番号'){inform('ベッド番号は固定です。候補を追加できません。');return;}
     if(f==='市町村'&&!validMunicipalityCandidate(v)){
-      inform('「'+v+'」は市町村名として登録できません。市・区・町・村で終わる自治体名を入力してください。住所・番地・電話番号は登録できません。');
+      inform('「'+v+'」は市町村の候補に登録できません。例：「小美玉」「小美玉市」のように入力してください。番地・数字・電話番号は登録できません。');
       return;
     }
     if(!state||!key){inform('アプリがロックされているため登録できません。');return;}
