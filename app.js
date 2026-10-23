@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-MASTEREXPLICIT1';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX01';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -577,7 +577,7 @@ function bindPatientMapEvents(){
   $$('.occupied-bed:not(.duplicate-bed)').forEach(x=>x.onclick=()=>{const p=state.patients.find(p=>p.id===x.dataset.id);if(p)openPatient(p)});
   $$('.empty-bed').forEach(x=>x.onclick=()=>openPatient(newPatient(x.dataset.newBed)));
 }function patientCard(p){const days=daysSince(p.data['入院日'])||p.data['入院日数']||'';const tasks=p.tasks?.filter(t=>!t.done).length||0;return `<article class="patient-card" data-id="${p.id}"><div class="pc-head"><span class="bed">${esc(p.data['ベッド番号']||'未配置')}</span><span class="name">${esc(p.data['氏名']||'氏名未入力')}</span></div><div class="pc-meta"><span>主治医 ${esc(p.data['主治医']||'-')}</span><span>入院 ${esc(days)}日</span><span>${esc(p.data['病名']||'')}</span></div><div class="tags">${statusTag(getStatus(p))}${tasks?`<span class="tag red">要対応 ${tasks}</span>`:''}</div></article>`}
-function newPatient(bed=''){const data={};legacyFields.forEach(k=>data[k]='');data['ベッド番号']=bed;return{id:uid(),data,status:'未設定',tasks:[],notes:[],dischargeDate:null,createdAt:nowISO(),updatedAt:nowISO(),_new:true}}
+function newPatient(bed=''){const data={};legacyFields.forEach(k=>data[k]='');data['ベッド番号']=bed;return{id:uid(),data,status:'未設定',tasks:[],notes:[],medications:[],dischargeDate:null,createdAt:nowISO(),updatedAt:nowISO(),_new:true}}
 // Ver.1.0.18: autosave patient form edits, with a visible durable-save status.
 const PATIENT_AUTOSAVE_DELAY=650;
 let patientAutoTimer=null, patientChangeRev=0, patientSavedRev=0, patientWriteBusy=null, patientTransitionBusy=false, patientIME=false;
@@ -677,14 +677,14 @@ function newPatientHasEnteredData(p){
   if(Object.entries(p.data||{}).some(([field,value])=>
     !['ベッド番号','入院日数'].includes(field)&&String(value??'').trim()!==''))return true;
   return p.sanThereseMeeting===true||(p.tasks||[]).length>0||(p.notes||[]).length>0||
-    (p.attachments||[]).length>0||!!p.dischargeDate||
+    (p.attachments||[]).length>0||(p.medications||[]).length>0||!!p.dischargeDate||
     (!!p.status&&p.status!=='未設定');
 }
 async function finishPatientAndNavigate(next,{closing=false}={}){
   if(patientTransitionBusy)return;
   // A photo operation uses an atomic transaction for metadata and encrypted pixels.
   // Do not navigate away while it is still running.
-  if(photoImportBusy||photoRotateBusy||photoDeleteBusy||photoReorderBusy||pdfExportBusy||noteWriteBusy){
+  if(photoImportBusy||photoRotateBusy||photoDeleteBusy||photoReorderBusy||pdfExportBusy||noteWriteBusy||patientMedicationBusy){
     alert('写真・PDFの処理が終わってから画面を切り替えてください。');return;
   }
   patientTransitionBusy=true;
@@ -724,7 +724,7 @@ function openPatient(p){
 }
 function renderPatientModal(){
   const p=selectedPatient;
-  document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="modal"><div class="sheet"><div class="sheethead"><button class="btn secondary" id="closeM">←</button><div class="patient-sheet-title"><h2>${esc(p.data['氏名']||'新規患者')}</h2><div class="notice">${esc(p.data['ベッド番号']||'病床未設定')}　${esc(p.data['病名']||'')}</div></div><div class="spacer"></div><span id="patientSaveStatus" role="status" aria-live="polite" class="patient-save-status">保存済み（自動保存）</span><button class="btn secondary" id="saveP">保存して閉じる</button></div><div class="tabs">${[['basic','基本'],['care','家族・介護'],['adl','ADL'],['support','退院支援'],['notes','経過記録'],['photos','写真・書類']].map(([k,n])=>`<button class="tab ${activeTab===k?'active':''}" data-tab="${k}">${n}</button>`).join('')}</div><div class="sheetbody" id="tabbody"></div></div></div>`);
+  document.body.insertAdjacentHTML('beforeend',`<div class="modal" id="modal"><div class="sheet"><div class="sheethead"><button class="btn secondary" id="closeM">←</button><div class="patient-sheet-title"><h2>${esc(p.data['氏名']||'新規患者')}</h2><div class="notice">${esc(p.data['ベッド番号']||'病床未設定')}　${esc(p.data['病名']||'')}</div></div><div class="spacer"></div><span id="patientSaveStatus" role="status" aria-live="polite" class="patient-save-status">保存済み（自動保存）</span><button class="btn secondary" id="saveP">保存して閉じる</button></div><div class="tabs">${[['basic','基本'],['medications','処方薬'],['care','家族・介護'],['adl','ADL'],['support','退院支援'],['notes','経過記録'],['photos','写真・書類']].map(([k,n])=>`<button class="tab ${activeTab===k?'active':''}" data-tab="${k}">${n}</button>`).join('')}</div><div class="sheetbody" id="tabbody"></div></div></div>`);
   $('#closeM').onclick=()=>finishPatientAndNavigate(closePatient,{closing:true});
   $('#saveP').onclick=()=>finishPatientAndNavigate(closePatient,{closing:true});
   $$('.tab').forEach(t=>t.onclick=()=>finishPatientAndNavigate(()=>{
@@ -733,7 +733,7 @@ function renderPatientModal(){
   renderTab();bindPatientAutosave();
 }
 function closePatient(){clearPatientAutoTimer();clearBasicPhotoPreview();dismissPhotoViewer();selectedPatient=null;$('#modal')?.remove();if(key&&state&&$('#main'))render()}
-function renderTab(){const root=$('#tabbody'),p=selectedPatient;if(activeTab==='photos'){renderPhotosTab();return;}if(activeTab==='basic'){renderBasicDashboard();return;}if(groups[activeTab]){root.innerHTML=`<div class="panel"><div class="form-grid">${groups[activeTab].map(fieldHtml).join('')}</div></div>`;bindMasterSelects(root);return}if(activeTab==='support'){root.innerHTML=`<div class="panel"><h3>退院支援</h3><div class="form-grid"><div class="field"><label>進捗ステータス</label>${masterSelectHtml('進捗ステータス',getStatus(p),'id="status"')}</div><div class="field"><label>退院日</label><input type="date" id="dischargeDate" value="${esc(p.dischargeDate||'')}"></div><div class="field span2"><label>退院支援メモ</label><textarea data-field="退院支援">${esc(p.data['退院支援']||'')}</textarea></div></div></div><div class="panel"><h3>要対応タスク</h3><div id="taskList">${taskListHtml(p)}</div><label class="mvp-task-label">対応内容<input id="newTask" maxlength="300" placeholder="例：家族に連絡、施設へ確認"></label><div class="mvp-task-options"><label>対応期限（任意）<input type="date" id="newTaskDue"></label><label class="mvp-urgent"><input type="checkbox" id="newTaskUrgent"> 優先対応</label><button class="btn" id="addTask">＋ タスク追加</button></div><p class="notice">期限を空欄にしたタスクも「要対応」一覧に残ります。</p></div><div class="panel"><button class="btn danger" id="dischargeNow">退院として登録</button><p class="notice">退院患者の情報は自動削除されず、退院患者記録に保持されます。</p></div>`;$('#addTask').onclick=addTask;$('#dischargeNow').onclick=()=>{if(!$('#dischargeDate').value)$('#dischargeDate').value=new Date().toISOString().slice(0,10);$('#status').value='退院先決定';};bindTaskChecks();bindMasterSelects(root);return}if(activeTab==='notes'){root.innerHTML=`<div class="panel"><h3>経過記録を追加</h3><p class="notice">${esc(DATA_MINIMIZATION_NOTICE)}</p><div class="form-grid"><div class="field"><label>種別</label>${masterSelectHtml('経過記録種別','面談','id="noteType"')}</div><div class="field"><label>日時</label><input id="noteAt" type="datetime-local" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}"></div><div class="field span2"><label>内容</label><textarea id="noteText" placeholder="対応内容・決定事項・次にやること"></textarea></div></div><button class="btn" id="addNote">記録追加</button><p id="noteSaveState" class="notice" role="status" aria-live="polite"></p></div><div class="panel"><h3>時系列</h3><div class="timeline">${notesHtml(p)}</div></div>`;$('#addNote').onclick=addNote;bindMasterSelects(root);return}}
+function renderTab(){const root=$('#tabbody'),p=selectedPatient;if(activeTab==='photos'){renderPhotosTab();return;}if(activeTab==='basic'){renderBasicDashboard();return;}if(activeTab==='medications'){renderPatientMedications();return;}if(groups[activeTab]){root.innerHTML=`<div class="panel"><div class="form-grid">${groups[activeTab].map(fieldHtml).join('')}</div></div>`;bindMasterSelects(root);return}if(activeTab==='support'){root.innerHTML=`<div class="panel"><h3>退院支援</h3><div class="form-grid"><div class="field"><label>進捗ステータス</label>${masterSelectHtml('進捗ステータス',getStatus(p),'id="status"')}</div><div class="field"><label>退院日</label><input type="date" id="dischargeDate" value="${esc(p.dischargeDate||'')}"></div><div class="field span2"><label>退院支援メモ</label><textarea data-field="退院支援">${esc(p.data['退院支援']||'')}</textarea></div></div></div><div class="panel"><h3>要対応タスク</h3><div id="taskList">${taskListHtml(p)}</div><label class="mvp-task-label">対応内容<input id="newTask" maxlength="300" placeholder="例：家族に連絡、施設へ確認"></label><div class="mvp-task-options"><label>対応期限（任意）<input type="date" id="newTaskDue"></label><label class="mvp-urgent"><input type="checkbox" id="newTaskUrgent"> 優先対応</label><button class="btn" id="addTask">＋ タスク追加</button></div><p class="notice">期限を空欄にしたタスクも「要対応」一覧に残ります。</p></div><div class="panel"><button class="btn danger" id="dischargeNow">退院として登録</button><p class="notice">退院患者の情報は自動削除されず、退院患者記録に保持されます。</p></div>`;$('#addTask').onclick=addTask;$('#dischargeNow').onclick=()=>{if(!$('#dischargeDate').value)$('#dischargeDate').value=new Date().toISOString().slice(0,10);$('#status').value='退院先決定';};bindTaskChecks();bindMasterSelects(root);return}if(activeTab==='notes'){root.innerHTML=`<div class="panel"><h3>経過記録を追加</h3><p class="notice">${esc(DATA_MINIMIZATION_NOTICE)}</p><div class="form-grid"><div class="field"><label>種別</label>${masterSelectHtml('経過記録種別','面談','id="noteType"')}</div><div class="field"><label>日時</label><input id="noteAt" type="datetime-local" value="${new Date(Date.now()-new Date().getTimezoneOffset()*60000).toISOString().slice(0,16)}"></div><div class="field span2"><label>内容</label><textarea id="noteText" placeholder="対応内容・決定事項・次にやること"></textarea></div></div><button class="btn" id="addNote">記録追加</button><p id="noteSaveState" class="notice" role="status" aria-live="polite"></p></div><div class="panel"><h3>時系列</h3><div class="timeline">${notesHtml(p)}</div></div>`;$('#addNote').onclick=addNote;bindMasterSelects(root);return}}
 // Seven rows are provisional, not a fixed requirement; keep original field keys
 // (家構, 入院元, 介護度 etc.) so FileMaker mapping and existing records still work.
 // Municipality is a new, distinct city/town/village field. No street address is copied.
@@ -1485,8 +1485,103 @@ function renderTasks(){
     const p=state.patients.find(p=>p.id===x.dataset.id);if(p)openPatient(p);
   });
 }
-function renderDrugs(){const ds=state.drugs||[];$('#main').innerHTML=`<div class="hero"><div><h1>薬情</h1><p>端末内の簡易薬剤マスター。患者処方そのものは保存しません。</p></div></div><div class="toolbar"><input id="dq" placeholder="薬名・分類・薬効で検索"></div><div id="drugList"></div>`;$('#dq').oninput=drawDrugs;drawDrugs()}
+function renderDrugs(){const ds=state.drugs||[];$('#main').innerHTML=`<div class="hero"><div><h1>薬情</h1><p>端末内の簡易薬剤マスター。患者別の登録は患者情報の「処方薬」タブから行えます。</p></div></div><div class="toolbar"><input id="dq" placeholder="薬名・分類・薬効で検索"></div><div id="drugList"></div>`;$('#dq').oninput=drawDrugs;drawDrugs()}
 function drawDrugs(){const q=($('#dq')?.value||'').toLowerCase().trim();const a=(state.drugs||[]).filter(d=>!q||[d['薬名'],d['医薬品分類'],d['薬効']].join(' ').toLowerCase().includes(q)).slice(0,100);$('#drugList').innerHTML=a.length?`<div class="drug-list">${a.map(d=>`<article class="drug"><b>${esc(d['薬名'])}</b><div class="small">${esc(d['医薬品分類'])}　${esc(d['薬価'])}</div><div class="effect">${esc(d['薬効'])}</div></article>`).join('')}</div>`:'<div class="empty">薬剤データがありません。設定から「薬剤CSV」を読み込んでください。</div>'}
+
+
+/* RX01: Patient-specific reference list. Selected master data is copied into
+ * the encrypted patient record to prevent later CSV replacement/reordering
+ * from changing the original selected drug. Not an electronic prescription. */
+let patientMedicationBusy=false;
+const MED_SNAPSHOT_FIELDS=['薬名','医薬品分類','薬価','薬効'];
+function medSnapshot(d){return Object.fromEntries(MED_SNAPSHOT_FIELDS.map(k=>[k,String(d?.[k]??'').trim()]))}
+function medSignature(d){return JSON.stringify(MED_SNAPSHOT_FIELDS.map(k=>String(d?.[k]??'').trim()))}
+function medRows(p){return Array.isArray(p?.medications)?p.medications:[]}
+function renderPatientMedications(){
+  const root=$('#tabbody');
+  root.innerHTML=`<div class="patient-med-page">
+    <section class="panel"><h3>処方薬（確認用）</h3>
+      <p class="notice">電子カルテ・処方箋を確認する際の補助一覧です。正式な処方・服薬の記録ではありません。分類・薬価・薬効は登録当時の情報であり、最新とは限りません。</p>
+      <p id="patientMedStatus" class="patient-med-status" role="status" aria-live="polite">薬を検索して一覧に追加できます。</p>
+      <h4>この患者の登録薬　<span id="patientMedCount"></span></h4><div id="patientMedList"></div>
+    </section>
+    <section class="panel"><h3>＋ 薬剤マスターから追加</h3>
+      <label class="patient-med-query-label">薬名・分類・薬効で検索
+        <input type="search" id="patientDrugQuery" autocomplete="off" placeholder="例：メネシット">
+      </label><div id="patientDrugResults"></div>
+    </section></div>`;
+  root.querySelector('#patientDrugQuery').oninput=drawPatientDrugResults;
+  drawPatientMedicationList();drawPatientDrugResults();
+}
+function drawPatientMedicationList(){
+  const patient=selectedPatient,host=$('#patientMedList'),count=$('#patientMedCount');
+  if(!patient||!host||!count)return;
+  const rows=medRows(patient);count.textContent=String(rows.length)+'件';
+  if(!rows.length){host.innerHTML='<p class="empty">登録薬はありません。下の検索から追加してください。</p>';return;}
+  host.innerHTML=rows.map(item=>{
+    const d=item.drug||{},details=MED_SNAPSHOT_FIELDS.filter(k=>k!=='薬名').map(k=>
+      `<div class="patient-med-fact"><dt>${esc(k)}</dt><dd>${esc(d[k]||'未登録')}</dd></div>`).join('');
+    return `<article class="patient-med-row"><div class="patient-med-line"><div><strong>${esc(d['薬名']||'名称未登録')}</strong>
+      <div class="notice">登録：${esc(String(item.addedAt||'').slice(0,10)||'不明')}</div></div>
+      <button type="button" class="btn danger patient-med-del" data-id="${esc(item.id)}">一覧から削除</button></div>
+      <details><summary>薬効・分類・薬価を見る</summary><dl>${details}</dl>
+        <p class="notice">これは登録時の薬剤マスターの写しです。最新の薬剤情報は医療機関の資料で確認してください。</p>
+      </details></article>`;
+  }).join('');
+  host.querySelectorAll('.patient-med-del').forEach(btn=>btn.onclick=()=>{void changePatientMedication('delete',btn.dataset.id)});
+}
+function drawPatientDrugResults(){
+  const search=$('#patientDrugQuery'),host=$('#patientDrugResults');
+  if(!host||!search)return;
+  const q=search.value.trim().normalize('NFKC').toLocaleLowerCase('ja');
+  if(!q){host.innerHTML='<p class="notice">検索すると候補が表示されます。選んだ薬だけ患者の一覧に保存します。</p>';return;}
+  const matched=(state?.drugs||[]).map((drug,index)=>({drug,index})).filter(({drug})=>
+    MED_SNAPSHOT_FIELDS.some(k=>String(drug[k]||'').normalize('NFKC').toLocaleLowerCase('ja').includes(q))).slice(0,60);
+  if(!matched.length){host.innerHTML='<p class="empty">一致する薬がありません。薬情マスターを確認してください。</p>';return;}
+  host.innerHTML=matched.map(({drug,index})=>`<div class="patient-med-hit">
+    <div><strong>${esc(drug['薬名'])}</strong><div class="notice">${esc(drug['医薬品分類']||'分類未登録')}　${esc(String(drug['薬価']||'').slice(0,100))}</div>
+    <div class="patient-med-preview">${esc(String(drug['薬効']||'').slice(0,120))}</div></div>
+    <button type="button" class="btn patient-med-add" data-index="${index}">この薬を追加</button></div>`).join('');
+  host.querySelectorAll('.patient-med-add').forEach(btn=>btn.onclick=()=>{void changePatientMedication('add',Number(btn.dataset.index))});
+}
+async function changePatientMedication(action,ident){
+  if(patientMedicationBusy)return;
+  const patient=selectedPatient,status=$('#patientMedStatus');
+  const inform=msg=>{if(status&&status.isConnected)status.textContent=msg;};
+  if(!key||!state||!patient){inform('ロック状態と患者情報を確認してください。');return;}
+  if(patient._new){inform('先に基本タブで氏名または患者IDを入力して保存してください。');return;}
+  if(patient.medications!=null&&!Array.isArray(patient.medications)){inform('登録済みデータの形式が不正です。変更は行いません。');return;}
+  const prev=medRows(patient).slice();let next;
+  if(action==='add'){
+    if(!Number.isSafeInteger(ident)||ident<0||ident>=(state.drugs||[]).length){inform('薬剤をもう一度検索してください。');return;}
+    const item=medSnapshot(state.drugs[ident]);
+    if(!item['薬名']){inform('薬名が空欄の候補は登録できません。');return;}
+    if(prev.some(r=>medSignature(r?.drug)===medSignature(item))){inform('同じ薬剤情報はすでに登録されています。');return;}
+    if(prev.length>=100){inform('一人の患者には100件まで登録できます。');return;}
+    next=[...prev,{id:uid(),drug:item,addedAt:nowISO()}];
+  }else if(action==='delete'){
+    const existing=prev.find(x=>x.id===ident);
+    if(!existing){inform('対象が見つかりません。');return;}
+    if(!confirm('「'+String(existing.drug?.['薬名']||'薬剤')+'」をこの患者の一覧から削除しますか？\n薬剤マスターは削除しません。'))return;
+    next=prev.filter(x=>x.id!==ident);
+  }else return;
+  patientMedicationBusy=true;
+  const buttons=Array.from(document.querySelectorAll('#tabbody .patient-med-add, #tabbody .patient-med-del'));
+  buttons.forEach(b=>b.disabled=true);
+  inform('暗号化保存しています…');
+  patient.medications=next;
+  try{
+    if(selectedPatient!==patient||!key||!state)throw new Error('患者またはロック状態が変わりました。');
+    await save();
+    if(selectedPatient===patient){drawPatientMedicationList();inform(action==='add'?'登録しました。薬名の下から情報を確認できます。':'患者の一覧から削除しました。');}
+  }catch(e){
+    patient.medications=prev;
+    if(selectedPatient===patient){drawPatientMedicationList();inform('保存失敗のため元に戻しました：'+String(e.message||e).slice(0,120));}
+  }finally{
+    patientMedicationBusy=false;
+    buttons.forEach(b=>{if(b.isConnected)b.disabled=false});
+  }
+}
 
 // City/town/village only. Exclude addresses and labels.
 // Staff deliberately enter concise municipality labels for the small iPad
