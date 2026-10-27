@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02-NAVFIX1';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02-NAVFIX1-JP01';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -441,23 +441,68 @@ function renderPatients(){
 function printText(v,max=0){const a=Array.from(String(v??'').trim());return esc(max?a.slice(0,max).join(''):a.join(''))}
 function shortCareLevel(v){const s=String(v||'').trim();return s.replace('要介護','要').replace('要支援','支')}
 function printPatientForBed(bed,patients){return patientsForBed(bed,patients)[0]||null}
-function printRowHtml(bed,patients){
-  const p=printPatientForBed(bed,patients);
-  if(!p)return`<tr><td>${esc(bed)}</td>${'<td></td>'.repeat(10)}</tr>`;
-  const d=p.data||{},days=daysSince(d['入院日'])||d['入院日数']||'';
-  return`<tr><td>${esc(bed)}</td><td>${printText(d['ＩＤ'])}</td><td>${printText(d['氏名'])}</td><td>${esc(shortAdmissionDate(d['入院日']))}</td><td>${printText(d['主治医'],3)}</td><td class="clip">${printText(d['病名'])}</td><td>${esc(shortCareLevel(d['介護度']))}</td><td class="clip">${printText(d['ケアマネ・施設'],12)}</td><td class="memo"></td><td>${printText(d['家構'])}</td><td>${esc(days)}</td></tr>`
+// Morning print: municipality is an existing privacy-limited field.
+// Do not add an address field or read an obsolete full-address field.
+function printMunicipality(p){return printText(p?.data?.['市町村'],3)}
+// The approved Basic tab uses 介護情報; retain the legacy care-tab field as fallback.
+function printCareManager(p){
+ const d=p?.data||{};
+ return String(d['介護情報']??'').trim()||String(d['ケアマネ・施設']??'').trim();
+}
+function printRoomName(bed){
+ const str=normalizeBed(bed);
+ const m=str.match(/^(ICU[1-3]|\d{3})(?:-|$)/);
+ return m?m[1]:str;
+}
+function printRowHtml(bed,patients,rowClass=''){
+ const p=printPatientForBed(bed,patients);
+ const attr=rowClass?' class="'+esc(rowClass)+'"':'';
+ if(!p)return '<tr'+attr+'><td>'+esc(bed)+'</td>'+'<td></td>'.repeat(11)+'</tr>';
+ const d=p.data||{},days=daysSince(d['入院日'])||d['入院日数']||'';
+ return '<tr'+attr+'><td>'+esc(bed)+'</td>'+
+  '<td'+(p.sanThereseMeeting===true?' class="saint-id"':'')+'>'+printText(d['ＩＤ'])+'</td>'+
+  '<td>'+printText(d['氏名'])+'</td>'+
+  '<td>'+esc(shortAdmissionDate(d['入院日']))+'</td>'+
+  '<td>'+printText(d['主治医'],3)+'</td>'+
+  '<td>'+printMunicipality(p)+'</td>'+
+  '<td class="disease-cell"><span class="disease-text">'+printText(d['病名'])+'</span></td>'+
+  '<td>'+esc(shortCareLevel(d['介護度']))+'</td>'+
+  '<td class="facility-cell"><span class="facility-text">'+printText(printCareManager(p))+'</span></td>'+
+  '<td class="memo"></td><td>'+printText(d['家構'])+'</td><td>'+esc(days)+'</td></tr>';
 }
 function printTableHtml(beds,patients){
-  return`<table class="morning-table"><colgroup><col class="c-bed"><col class="c-id"><col class="c-name"><col class="c-admit"><col class="c-doc"><col class="c-disease"><col class="c-care"><col class="c-facility"><col class="c-memo"><col class="c-family"><col class="c-days"></colgroup><thead><tr>${['部屋','ID','氏名','入院日','主治医','病名','介護度','ケアマネ・施設','メモ','家族','日数'].map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>${beds.map(b=>printRowHtml(b,patients)).join('')}</tbody></table>`
+ const rows=beds.map((bed,i)=>{
+  const room=printRoomName(bed),first=i===0||printRoomName(beds[i-1])!==room;
+  const last=i===beds.length-1||printRoomName(beds[i+1])!==room;
+  const gap=first&&i>0?'<tr class="room-gap" aria-hidden="true"><td colspan="12"></td></tr>':'';
+  const flags=[first?'room-first':'',last?'room-last':''].filter(Boolean).join(' ');
+  return gap+printRowHtml(bed,patients,flags);
+ }).join('');
+ const cols=['bed','id','name','admit','doc','address','disease','care','facility','memo','family','days'];
+ const headers=['部屋','ID','氏名','入院日','主治医','住所','病名','介護度','ケアマネ・施設','メモ','家族','日数'];
+ return '<table class="morning-table"><colgroup>'+cols.map(c=>'<col class="c-'+c+'">').join('')+
+  '</colgroup><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table>';
 }
 function printExtraTableHtml(patients){
-  const headers=['部屋','ID','氏名','入院日','主治医','病名','介護度','ケアマネ・施設','メモ','家族','日数'];
-  const rows=patients.map(p=>{
-    const d=p.data||{},days=daysSince(d['入院日'])||d['入院日数']||'';
-    const cells=[d['ベッド番号']||'未配置',d['ＩＤ'],d['氏名'],shortAdmissionDate(d['入院日']),String(d['主治医']||'').slice(0,3),d['病名'],shortCareLevel(d['介護度']),String(d['ケアマネ・施設']||'').slice(0,12),'',d['家構'],days];
-    return `<tr>${cells.map(x=>`<td>${printText(x)}</td>`).join('')}</tr>`;
+ const cols=['bed','id','name','admit','doc','address','disease','care','facility','memo','family','days'];
+ const headers=['部屋','ID','氏名','入院日','主治医','住所','病名','介護度','ケアマネ・施設','メモ','家族','日数'];
+ const rows=patients.map(p=>{
+  const d=p.data||{},days=daysSince(d['入院日'])||d['入院日数']||'';
+  const cells=[d['ベッド番号']||'未配置',d['ＩＤ'],d['氏名'],
+   shortAdmissionDate(d['入院日']),String(d['主治医']||'').slice(0,3),
+   String(d['市町村']||'').slice(0,3),d['病名'],shortCareLevel(d['介護度']),
+   printCareManager(p),'',d['家構'],days];
+  const row=cells.map((v,i)=>{
+   const klass=i===1&&p.sanThereseMeeting===true?' class="saint-id"':
+    i===6?' class="disease-cell"':i===8?' class="facility-cell"':'';
+   const content=i===6?'<span class="disease-text">'+printText(v)+'</span>':
+    i===8?'<span class="facility-text">'+printText(v)+'</span>':printText(v);
+   return '<td'+klass+'>'+content+'</td>';
   }).join('');
-  return `<table class="morning-table"><colgroup><col class="c-bed"><col class="c-id"><col class="c-name"><col class="c-admit"><col class="c-doc"><col class="c-disease"><col class="c-care"><col class="c-facility"><col class="c-memo"><col class="c-family"><col class="c-days"></colgroup><thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${rows}</tbody></table>`;
+  return '<tr>'+row+'</tr>';
+ }).join('') || '<tr><td colspan="12">現在、未配置・重複の患者はいません</td></tr>';
+ return '<table class="morning-table"><colgroup>'+cols.map(c=>'<col class="c-'+c+'">').join('')+
+  '</colgroup><thead><tr>'+headers.map(h=>'<th>'+h+'</th>').join('')+'</tr></thead><tbody>'+rows+'</tbody></table>';
 }
 function printMorningList(){
   const patients=activePatients(),general=layoutBedNumbers(BED_LAYOUT,patients),icu=layoutBedNumbers(ICU_LAYOUT,patients);
@@ -472,7 +517,8 @@ function printMorningList(){
   // A second patient on the same official bed must never disappear from print.
   const duplicates=officialBeds().flatMap(b=>patientsForBed(b,patients).slice(1));
   const extra=[...unplaced,...duplicates];
-  if(extra.length)pages.push({ward:'その他・未配置／重複',extra});
+  // Keep four A4 pages even when there are no unplaced or duplicate patients.
+  pages.push({ward:'その他・未配置／重複',extra});
   const d=new Date(),date=`${d.getFullYear()}/${String(d.getMonth()+1).padStart(2,'0')}/${String(d.getDate()).padStart(2,'0')}`;
   $('#morningPrint')?.remove();
   const root=document.createElement('div');root.id='morningPrint';root.className='morning-print';
@@ -598,6 +644,11 @@ function capturePatientForm(){
   const meeting=$('#sanThereseCheck');if(meeting&&Boolean(p.sanThereseMeeting) !== meeting.checked){p.sanThereseMeeting=meeting.checked;changed=true}
   const status=$('#status');if(status&&String(p.status??'')!==status.value){p.status=status.value;changed=true}
   const date=$('#dischargeDate');if(date&&(p.dischargeDate||'')!==date.value){p.dischargeDate=date.value||null;changed=true}
+  // Complete the journal admission queue only when the patient is now assigned
+  // to an official bed. This flag is saved together with the patient data.
+  if(p.journalAdmissionPending===true&&isMappedBed(p.data['ベッド番号'])){
+    p.journalAdmissionPending=false;changed=true;
+  }
   if(changed){patientChangeRev++;patientSaveIndicator('未保存の変更あり','pending')}
   return changed;
 }
@@ -2682,7 +2733,7 @@ function bindPendingDischarges(){
 // Admission queue uses real encrypted patient records; no automatic OCR registration.
 let journalEntryOpen=false,journalScanImage=null,journalScanText='',journalScanStatus='';
 function renderJournalPreview(){
-  const admissions=state.patients.filter(p=>!p.dischargeDate&&p.journalAdmissionPending).sort((a,b)=>String(a.data['入院日']||'').localeCompare(String(b.data['入院日']||'')));
+  const admissions=state.patients.filter(p=>!p.dischargeDate&&p.journalAdmissionPending&&!isMappedBed(p.data?.['ベッド番号'])).sort((a,b)=>String(a.data['入院日']||'').localeCompare(String(b.data['入院日']||'')));
   const entry=`<div class="journal-entry"><h3>新しい患者を手入力</h3><div class="journal-entry-fields"><label>氏名<input id="journalNewName" type="text" autocomplete="off" placeholder="氏名を入力"></label><label>入院日<input id="journalNewDate" type="date" value="${new Date().toLocaleDateString('sv-SE')}"></label><label>ベッド配置先<button class="btn secondary journal-pick" id="journalNewBedPick" type="button">その他・未配置 ▾</button><input type="hidden" id="journalNewBed" value=""></label></div><div class="journal-entry-actions"><button type="button" class="btn secondary" id="journalCancel">キャンセル</button><button type="button" class="btn" id="journalAdd">一覧に追加</button></div></div>`;
   $('#main').innerHTML=`<div class="hero"><div><h1>日誌・患者情報取り込み</h1><p>実務試用版 Ver.${APP_VERSION} ／ 入院患者の手入力と配置</p></div></div>
   <div class="panel journal-warning"><b>手入力患者は実際の患者管理データに保存されます</b><p>写真の文字認識は未実装です。業務に必要な内容のみを入力し、正式な記録は電子カルテで管理してください。必要なら手動バックアップを利用できます。既存患者と同姓同名の場合は追加前に確認します。</p><label class="btn secondary journal-photo">📷 日誌の写真を選択・撮影<input type="file" id="journalPhoto" accept="image/*" style="display:none"></label><div id="journalPhotoInfo" class="notice"></div><div id="journalScanPreview"></div></div>
