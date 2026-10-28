@@ -711,3 +711,248 @@ body.msw-private { visibility: hidden !important; }
   }
   .morning-table td:nth-last-child(2),.morning-table td:last-child{padding:0!important}
 }
+
+/* RX035 independent master reference panel. */
+#modal #rx035Panel{display:grid;gap:10px}
+#modal #rx035Panel label{display:grid;gap:5px;font-weight:700;font-size:13px}
+#modal #rx035Panel input,#modal #rx035Panel select{width:100%;min-width:0}
+#modal #rx035Summary{overflow-wrap:anywhere;white-space:normal}
+#modal #rx035Results{max-height:270px;overflow-y:auto;border:1px solid var(--line);border-radius:8px;padding:0 8px}
+
+
+/* RX036: per-drug master entry/editor, iPad mini tap-friendly. */
+#main .rx036Actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:10px 0;padding:4px 0}
+#main .rx036Actions #rx036Notice{max-width:100%;overflow-wrap:anywhere}
+#main #rx036Editor[hidden]{display:none!important}
+#main #rx036Editor{margin:12px 0;padding:14px}
+#main #rx036Editor form{display:grid;gap:12px}
+#main #rx036Editor label{display:grid;gap:6px;font-weight:700;font-size:14px}
+#main #rx036Editor input,#main #rx036Editor textarea{width:100%;min-width:0;font-size:16px}
+#main #rx036Editor textarea{resize:vertical;white-space:pre-wrap}
+#main #rx036Editor .rx036Controls{display:flex;flex-wrap:wrap;gap:8px}
+#main #rx036Editor #rx036FormStatus{font-weight:700;overflow-wrap:anywhere;min-height:1.2em}
+#main .drug .rx036Edit{margin-top:9px;min-height:38px}
+#main .rx036Foot{margin:12px 0;font-size:12px}
+
+/* RX036 fix3: accessible tap-size live suggestions. */
+#rx036CategoryMatches[hidden]{display:none!important}
+#rx036CategoryMatches{border:1px solid #8aaca9;border-radius:10px;padding:6px;background:var(--panel,#fff);display:grid;gap:4px;max-height:230px;overflow-y:auto;overscroll-behavior:contain}
+#rx036CategoryMatches .rx036CategoryCount{font-size:12px;opacity:.78;padding:3px 8px}
+#rx036CategoryMatches .rx036CategoryOption{display:block;width:100%;font-size:15px;font-weight:600;min-height:44px;line-height:1.5;text-align:left;background:transparent;color:inherit;border:1px solid rgba(125,155,150,.28);border-radius:7px;padding:9px 12px;overflow-wrap:anywhere}
+#rx036CategoryMatches .rx036CategoryOption:focus,#rx036CategoryMatches .rx036CategoryOption:active{outline:2px solid #247971;background:#e0f5f1;color:#154b46}
+#rx036CategoryMatches .rx036CategoryEmpty{font-size:13px;padding:8px}
+
+/* RX036 fix4: destructive action is available only on existing master entries. */
+#rx036Delete[hidden]{display:none!important}
+#rx036Delete{margin-left:auto}
+
+/* RX037 structured drug prices / generic alternatives: responsive iPad mini. */
+#rx036Editor .rx037Section{margin:8px 0 12px;border:1px solid rgba(104,133,132,.32);border-radius:10px;padding:12px;min-width:0}
+#rx036Editor .rx037Section h4{margin:0 0 6px;font-size:16px}
+#rx036Editor .rx037Row{display:grid;grid-template-columns:minmax(48px,1fr) minmax(72px,1fr) minmax(80px,1.3fr) 38px;gap:6px;align-items:end;margin:8px 0}
+#rx036Editor .rx037Row label{font-size:12px;min-width:0}
+#rx036Editor .rx037Row input,#rx036Editor .rx037Row select{font-size:16px;min-width:0;padding:8px 6px;max-width:100%}
+#rx036Editor .rx037Row .rx037RemovePrice{min-height:40px;padding:4px;font-size:19px}
+#rx036Editor .rx037Generic{border:1px solid rgba(104,133,132,.38);border-radius:8px;padding:10px;margin:10px 0;background:rgba(115,144,137,.06)}
+#rx036Editor .rx037GenericTitle{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px}
+#rx036Editor .rx037GenericTitle strong{font-size:15px}
+#rx036Editor .rx037GenericTitle button{font-size:12px;padding:5px 8px}
+#rx036Editor #rx037Legacy{padding:11px 0}
+#rx036Editor #rx037Legacy summary{font-weight:700;cursor:pointer;color:inherit;min-height:36px}
+#drugList .rx037Summary{font-size:12px;margin-top:8px;overflow-wrap:anywhere}
+@media(max-width:425px){#rx036Editor .rx037Row{grid-template-columns:minmax(43px,1fr) minmax(66px,1fr) minmax(74px,1.25fr) 34px;gap:4px}#rx036Editor .rx037Row input,#rx036Editor .rx037Row select{padding:7px 4px}}
+
+/* RX038 same-ingredient multiple originator brand editor */
+#rx036Editor .rx038Section{border:1px solid rgba(92,137,139,.38);border-radius:10px;padding:12px;min-width:0}
+#rx036Editor .rx038Section h4{margin:0 0 9px;font-size:16px}
+#rx036Editor .rx038MainBrand{background:rgba(96,155,146,.11);padding:9px 12px;border-radius:9px;margin:12px 0;overflow-wrap:anywhere}
+#rx036Editor .rx038MainBrand small{display:block;margin-top:4px;font-weight:400}
+#rx036Editor .rx038Brand{border:1px solid rgba(92,137,139,.35);background:rgba(92,137,139,.06);border-radius:9px;margin:12px 0;padding:10px;min-width:0}
+#rx036Editor .rx038BrandHead{display:flex;align-items:center;justify-content:space-between;gap:6px;margin-bottom:10px}
+#rx036Editor .rx038BrandHead button{padding:5px 7px;font-size:12px}
+#rx036Editor .rx038PriceRow{display:grid;grid-template-columns:minmax(45px,1fr) minmax(65px,.95fr) minmax(80px,1.2fr) 34px;align-items:end;gap:5px;margin:8px 0}
+#rx036Editor .rx038PriceRow label{font-size:12px;min-width:0}
+#rx036Editor .rx038PriceRow input,#rx036Editor .rx038PriceRow select{font-size:16px;min-width:0;width:100%;padding:7px 5px}
+#rx036Editor .rx038RemoveRow{min-height:39px;padding:3px;font-size:18px}
+#drugList .rx038Summary{font-size:12px;margin-top:8px;overflow-wrap:anywhere}
+@media(max-width:430px){#rx036Editor .rx038PriceRow{grid-template-columns:minmax(42px,1fr) minmax(62px,.9fr) minmax(72px,1.15fr) 32px;gap:4px}#rx036Editor .rx038PriceRow input,#rx036Editor .rx038PriceRow select{padding:6px 3px}}
+
+/* RX039: grouped, responsive input layout without changing existing data. */
+#main #rx036Editor{max-width:1000px;scroll-margin-top:72px;padding:clamp(11px,2vw,18px)}
+#main #rx036Editor>h3{font-size:19px;margin:0 0 6px}
+#main #rx036Editor>p.notice{font-size:12px;margin:0 0 12px}
+#main #rx036Editor #rx036Form{gap:12px}
+#main #rx036Editor .rx039Summary{padding:10px 12px;background:#f0f5f5;border:1px solid #d4e2e1;border-radius:10px;font-size:13px;font-weight:700;line-height:1.6;overflow-wrap:anywhere}
+#main #rx036Editor .rx039Group{margin:0;padding:13px;border:1px solid var(--line);border-radius:12px;background:#fff;min-width:0}
+#main #rx036Editor .rx039Group .rx039Title{margin:0 0 7px;font-size:17px;line-height:1.5;font-weight:800}
+#main #rx036Editor .rx039Group .rx039Help{margin:0 0 10px;font-size:12px;line-height:1.6;color:var(--muted)}
+#main #rx036Editor .rx039Fields{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+#main #rx036Editor .rx039Fields>label:first-child{grid-column:1/-1}
+#main #rx036Editor .rx039Basics>#rx036CategoryMatches{margin-top:7px}
+#main #rx036Editor .rx039Basics>p.notice{margin:6px 0 0;font-size:12px}
+#main #rx036Editor .rx039Originals{background:#fbfdfd}
+#main #rx036Editor .rx039Originals>.rx038MainBrand{background:#edf4f3;border:1px solid #dbe8e7;margin:11px 0 0;font-weight:800}
+#main #rx036Editor .rx039Originals>.rx038MainBrand small{font-weight:400;opacity:.8}
+#main #rx036Editor .rx039Originals>#rx037MasterPrice{border:1px solid #dbe8e7;border-radius:0 0 9px 9px;background:#fff;margin:0 0 12px;padding:10px 10px 12px}
+#main #rx036Editor .rx039Originals #rx037MasterPrice h4{font-size:15px;margin:0 0 7px}
+#main #rx036Editor .rx039Originals #rx037MasterPrice>p.notice{font-size:11px;line-height:1.5;margin:5px 0 8px}
+#main #rx036Editor .rx039Originals #rx038Brands>.rx038Brand{background:#fff}
+#main #rx036Editor .rx039Generics{background:#fbfdfd}
+#main #rx036Editor .rx039Generics .rx037Generic{background:#fff}
+#main #rx036Editor .rx039Notes textarea{min-height:76px}
+#main #rx036Editor #rx037Legacy.rx039Legacy{padding:12px;margin:0;border:1px solid var(--line);border-radius:10px;background:#fafcfc}
+#main #rx036Editor .rx039Legacy>summary{font-size:13px}
+#main #rx036Editor .rx039Footer{font-size:12px;color:var(--muted);line-height:1.6;margin:0 2px}
+#main #rx036Editor .rx036Controls{position:sticky;bottom:77px;z-index:5;background:rgba(255,255,255,.97);padding:10px;border:1px solid var(--line);border-radius:12px;box-shadow:0 4px 16px rgba(5,45,48,.08)}
+#main #rx036Editor .rx036Controls>.btn{min-height:44px}
+#main #rx036Editor .rx039Originals [data-rx038-action="add-brand"],#main #rx036Editor .rx039Generics [data-rx037-action="add-generic"]{min-height:44px}
+#main #rx036Editor .rx039Originals .rx038PriceRow,#main #rx036Editor .rx039Generics .rx037Row{grid-template-columns:minmax(60px,1fr) minmax(75px,.9fr) minmax(85px,1.25fr) 38px;gap:6px}
+#main #rx036Editor .rx039Originals .rx038RemoveRow,#main #rx036Editor .rx039Generics .rx037RemovePrice{min-width:36px;min-height:42px}
+@media(max-width:660px){
+ #main #rx036Editor .rx039Fields{grid-template-columns:minmax(0,1fr)}
+ #main #rx036Editor .rx039Fields>label:first-child{grid-column:1}
+ #main #rx036Editor .rx039Group{padding:10px}
+ #main #rx036Editor .rx039Originals .rx038PriceRow,#main #rx036Editor .rx039Generics .rx037Row{grid-template-columns:minmax(43px,1fr) minmax(62px,.85fr) minmax(75px,1.1fr) 32px;gap:4px}
+ #main #rx036Editor .rx036Controls{bottom:75px}
+}
+
+/* RX040: whole-card tap for edit. No per-card edit button. */
+#main .drug-list article.drug.rx040TapCard{
+ position:relative;cursor:pointer;touch-action:manipulation;
+ padding-right:27px;min-height:56px;
+ -webkit-tap-highlight-color:rgba(15,118,110,.15);
+ transition:background-color .12s,border-color .12s;
+}
+#main .drug-list article.drug.rx040TapCard::after{
+ content:"›";position:absolute;top:8px;right:10px;color:#799391;
+ font-size:24px;font-weight:400;line-height:1;pointer-events:none;
+}
+#main .drug-list article.drug.rx040TapCard:hover{border-color:#7eaaa5;background:#f8fcfb}
+#main .drug-list article.drug.rx040TapCard:active{background:#eaf7f3;border-color:#0f766e}
+#main .drug-list article.drug.rx040TapCard:focus-visible{
+ outline:3px solid #0f766e;outline-offset:2px;
+}
+#main .rx040TapHint{font-size:12px;color:var(--muted)}
+@media(prefers-reduced-motion:reduce){#main .drug-list article.drug.rx040TapCard{transition:none}}
+
+
+/* RX041: native optional disclosure for ingredient (data preserved). */
+#main #rx036Editor .rx039Fields{grid-template-columns:minmax(0,1fr)}
+#main #rx036Editor .rx039Fields>label:first-child{grid-column:auto}
+#main #rx036Editor #rx041IngredientDetails{
+ display:block;margin:12px 0 0;border:1px solid var(--line);
+ border-radius:10px;background:#fafcfc;min-width:0;overflow:hidden;
+}
+#main #rx036Editor #rx041IngredientDetails>summary{
+ padding:12px;font-size:14px;font-weight:700;line-height:1.5;
+ cursor:pointer;min-height:44px;list-style:disclosure-closed;
+ -webkit-tap-highlight-color:rgba(15,118,110,.15);
+}
+#main #rx036Editor #rx041IngredientDetails[open]>summary{
+ list-style:disclosure-open;border-bottom:1px solid var(--line);
+}
+#main #rx036Editor #rx041IngredientDetails>summary:focus-visible{
+ outline:2px solid var(--brand);outline-offset:-3px;border-radius:8px;
+}
+#main #rx036Editor #rx041IngredientState{
+ margin-left:8px;color:var(--brand);font-weight:700;font-size:12px;
+}
+#main #rx036Editor .rx041IngredientContent{padding:10px 12px 12px}
+#main #rx036Editor .rx041IngredientHelp{
+ font-size:12px;line-height:1.6;color:var(--muted);margin:0 0 8px;
+}
+#main #rx036Editor #rx041IngredientDetails label{margin:0}
+#main #rx036Editor #rx041IngredientDetails input{min-height:44px}
+
+
+/* RX042: 5 logical-row summary, finger-friendly on iPad mini. */
+#main #drugList .rx042FiveLines{display:grid;grid-template-columns:minmax(0,1fr);gap:0;min-width:0}
+#main #drugList .rx042Line{padding:5px 0;display:flex;align-items:baseline;gap:5px;min-width:0;
+ border-bottom:1px solid rgba(100,130,130,.13);line-height:1.5}
+#main #drugList .rx042Line:last-child{border-bottom:0}
+#main #drugList .rx042Label{font-size:12px;flex:0 0 auto;color:#48696b;font-weight:700}
+#main #drugList .rx042Value{min-width:0;overflow-wrap:anywhere;white-space:normal;font-size:13px}
+#main #drugList .rx042Names .rx042Value{font-size:16px;font-weight:800;color:var(--ink)}
+#main #drugList .rx042Generics .rx042Value{font-weight:700;color:var(--ink)}
+#main #drugList .rx042OriginPrice .rx042Value,
+#main #drugList .rx042GenericPrice .rx042Value{font-size:12px;line-height:1.6}
+#main #drugList .rx042CategoryEffect{display:flex;gap:0;min-width:0;align-items:baseline}
+#main #drugList .rx042Category{flex:0 1 auto;font-size:12px;color:var(--muted);overflow-wrap:anywhere}
+#main #drugList .rx042Effect{flex:1 1 auto;min-width:0;font-size:12px;color:var(--muted);
+ overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:block}
+#main #rx036Editor .rx042Help{font-size:12px;line-height:1.65;color:#355c59;
+ border:1px solid #c9dfdc;background:#eff8f5;border-radius:10px;padding:9px 12px;margin:0}
+#main #rx036Editor details.rx042BrandDetails{margin-top:10px;border:1px solid #d2e1df;
+ border-radius:9px;background:#fbfdfd;padding:0;overflow:hidden}
+#main #rx036Editor details.rx042BrandDetails>summary{
+ font-size:13px;font-weight:700;color:#28645c;padding:11px;
+ min-height:44px;cursor:pointer;line-height:1.5}
+#main #rx036Editor details.rx042BrandDetails[open]>summary{border-bottom:1px solid #d2e1df}
+#main #rx036Editor details.rx042BrandDetails>summary:focus-visible{outline:2px solid var(--brand);outline-offset:-2px}
+#main #rx036Editor details.rx042BrandDetails>[data-rx038-prices],
+#main #rx036Editor details.rx042BrandDetails>[data-rx037-price-list]{padding:7px 10px 0}
+#main #rx036Editor details.rx042BrandDetails>button{margin:7px 10px 10px}
+@media(max-width:600px){
+ #main #drugList .rx042Line{flex-wrap:wrap;gap:0 5px}
+ #main #drugList .rx042Line.rx042CategoryEffect{flex-wrap:wrap}
+ #main #drugList .rx042Effect{white-space:normal;display:-webkit-box;-webkit-box-orient:vertical;
+ -webkit-line-clamp:2;line-clamp:2}
+}
+
+
+/* RX043: remove redundant basic section; move original #1 name into
+   originator panel and classification into notes. All controls preserved. */
+#main #rx036Editor #rx039Basics{display:none!important}
+#main #rx036Editor .rx043PrimaryBrand{
+ display:grid;gap:8px;align-items:start;background:#edf5f3;
+ border-radius:10px 10px 0 0;font-size:15px;font-weight:800;
+}
+#main #rx036Editor .rx043PrimaryBrand strong#rx038MainName{
+ display:none;
+}
+#main #rx036Editor .rx043PrimaryBrand small{
+ margin:0;font-size:12px;line-height:1.5;color:var(--muted);
+}
+#main #rx036Editor .rx043PrimaryBrand label.rx043PrimaryName{
+ font-size:14px;font-weight:700;min-width:0;
+}
+#main #rx036Editor .rx043PrimaryBrand label.rx043PrimaryName input{
+ width:100%;min-width:0;font-size:16px;min-height:44px;
+ background:#fff;border:1px solid #c4d8d4;border-radius:9px;
+ padding:9px 11px;
+}
+#main #rx036Editor .rx043Notes>label{
+ margin:9px 0 0;
+}
+#main #rx036Editor .rx043Notes>#rx036CategoryMatches{
+ margin-top:7px;
+}
+#main #rx036Editor .rx043Notes>p.notice{
+ margin:6px 0 5px;font-size:12px;
+}
+#main #rx036Editor .rx043Notes>#rx041IngredientDetails{
+ margin:11px 0 13px;
+}
+#main #rx036Editor .rx039Originals>#rx042Help{
+ margin:0 0 12px;
+}
+
+
+/* RX045 fictional-patient medicine name lookup. Does not alter RX044 master. */
+#modal #patientDrugResults .rx045Safety{
+ margin:7px 0;padding:9px 10px;border:1px solid #b5d1cb;
+ border-radius:8px;background:#f2f9f7;font-size:12px;line-height:1.55;
+}
+#modal #patientDrugResults .rx045Candidate{gap:10px;min-width:0}
+#modal #patientDrugResults .rx045Candidate>div{min-width:0;flex:1 1 auto}
+#modal #patientDrugResults .rx045Candidate strong{font-size:15px;overflow-wrap:anywhere}
+#modal #patientDrugResults .rx045Badge{font-size:12px;color:#256a64;font-weight:700;padding-top:3px}
+#modal #patientDrugResults .rx045Preview{font-size:12px;line-height:1.6;
+ color:#344f50;overflow-wrap:anywhere;margin:4px 0}
+#modal #patientDrugResults .rx045Choose{min-height:44px;white-space:nowrap}
+#modal .rx045SelectedNote{font-size:12px;line-height:1.55;color:#286a64;
+ font-weight:600;margin-top:3px;overflow-wrap:anywhere}
+@media(max-width:600px){
+ #modal #patientDrugResults .rx045Candidate{align-items:stretch;flex-direction:column}
+ #modal #patientDrugResults .rx045Choose{width:100%;white-space:normal}
+}

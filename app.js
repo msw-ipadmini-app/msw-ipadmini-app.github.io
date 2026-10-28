@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02-NAVFIX1-JP01';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02-NAVFIX1-JP01-RX046-PREP';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -1539,7 +1539,15 @@ function renderTasks(){
   });
 }
 function renderDrugs(){const ds=state.drugs||[];$('#main').innerHTML=`<div class="hero"><div><h1>薬情</h1><p>端末内の簡易薬剤マスター。患者別の登録は患者情報の「処方薬」タブから行えます。</p></div></div><div class="toolbar"><input id="dq" placeholder="薬名・分類・薬効で検索"></div><div id="drugList"></div>`;$('#dq').oninput=drawDrugs;drawDrugs()}
-function drawDrugs(){const q=($('#dq')?.value||'').toLowerCase().trim();const a=(state.drugs||[]).filter(d=>!q||[d['薬名'],d['医薬品分類'],d['薬効']].join(' ').toLowerCase().includes(q)).slice(0,100);$('#drugList').innerHTML=a.length?`<div class="drug-list">${a.map(d=>`<article class="drug"><b>${esc(d['薬名'])}</b><div class="small">${esc(d['医薬品分類'])}　${esc(d['薬価'])}</div><div class="effect">${esc(d['薬効'])}</div></article>`).join('')}</div>`:'<div class="empty">薬剤データがありません。設定から「薬剤CSV」を読み込んでください。</div>'}
+function rx038MasterSearchText(drug){
+ const secondaries=Array.isArray(drug?.rx038?.otherOriginals)?drug.rx038.otherOriginals:[];
+ const generics=Array.isArray(drug?.rx037?.generics)?drug.rx037.generics:[];
+ return [drug?.['薬名'],drug?.['医薬品分類'],drug?.['薬効'],
+         drug?.rx038?.ingredient,
+         ...secondaries.map(x=>x?.name),
+         ...generics.map(x=>x?.name)].join(' ').toLowerCase();
+}
+function drawDrugs(){const q=($('#dq')?.value||'').toLowerCase().trim();const a=(state.drugs||[]).filter(d=>!q||rx038MasterSearchText(d).includes(q)).slice(0,100);$('#drugList').innerHTML=a.length?`<div class="drug-list">${a.map(d=>`<article class="drug"><b>${esc(d['薬名'])}</b><div class="small">${esc(d['医薬品分類'])}　${esc(d['薬価'])}</div><div class="effect">${esc(d['薬効'])}</div></article>`).join('')}</div>`:'<div class="empty">薬剤データがありません。設定から「薬剤CSV」を読み込んでください。</div>'}
 
 
 /* RX01: Patient-specific reference list. Selected master data is copied into
@@ -1601,15 +1609,15 @@ function renderPatientMedications(){
  const root=$('#tabbody');
  root.innerHTML=`<div class="patient-med-page">
    <section class="panel"><h3>処方薬一覧（確認用）</h3>
-    <p class="notice">薬効・後発品はFileMaker由来の登録内容で、現在の添付文書・薬価とは限りません。正式な処方・服薬の記録ではありません。</p>
+    <p class="notice">薬効・後発品・薬価は薬情マスター等の参考情報です。実際の処方薬との一致や最新の薬価を保証しません。処方は電子カルテなどで確認してください。</p>
     <div id="patientMedSummary" class="patient-med-summary" role="status" aria-live="polite"></div>
     <p class="notice">参考日額＝確認した単価 × 1日数量。定期薬のみ集計し、未設定分は除外します。実際の請求額ではありません。</p>
     <p id="patientMedStatus" class="patient-med-status" role="status" aria-live="polite">薬名と薬効・後発品・薬価を一覧で確認できます。</p>
     <h4>この患者の登録薬　<span id="patientMedCount"></span></h4><div id="patientMedList"></div>
    </section>
    <section class="panel"><h3>＋ 薬剤マスターから追加</h3>
-    <label class="patient-med-query-label">薬名・分類・薬効で検索
-     <input type="search" id="patientDrugQuery" autocomplete="off" placeholder="例：メネシット">
+    <label class="patient-med-query-label">先発品・後発品名、分類・薬効で検索
+     <input type="search" id="patientDrugQuery" autocomplete="off" placeholder="例：アムロジン、サワイ">
     </label><div id="patientDrugResults"></div>
    </section>
  </div>`;
@@ -1631,12 +1639,13 @@ function drawPatientMedicationList(){
    const currentPrice=p.unitPrice?medMoney(Number(p.unitPrice))+(p.unit?'／'+p.unit:'（単位未確認）'):'薬価未設定';
    const costText=cost===null?(p.status==='定期'?'参考日額：計算待ち':'参考日額：対象外'):'参考日額：'+medMoney(cost);
    const options=medPriceChoices(d['薬価']);
-   const optionHtml=options.length?`<label>旧データから規格・薬価を選択（内容を確認）<select class="patient-med-choice"><option value="">候補から選ぶ（任意）</option>${
+   const optionHtml=options.length?`<label>登録した薬情の規格・薬価候補を選択（内容を確認）<select class="patient-med-choice"><option value="">候補から選ぶ（任意）</option>${
       options.map((v,i)=>`<option value="${i}">${esc(v.strength)} ／ ${esc(v.unitPrice)}円</option>`).join('')
     }</select></label>`:'<p class="notice">元の薬価から規格別価格を安全に抽出できません。価格は手動で確認してください。</p>';
    return `<article class="patient-med-row">
      <div class="patient-med-line"><div><strong>${esc(d['薬名']||'名称未登録')}</strong>
-       <div class="notice">${esc(d['医薬品分類']||'分類未登録')}　・　${esc(status)}</div></div>
+       <div class="notice">${esc(d['医薬品分類']||'分類未登録')}　・　${esc(status)}</div>${item.rx045Origin?.type==='rx045-manual-brand'?
+         '<div class="rx045SelectedNote">薬情マスターの'+esc(item.rx045Origin.label||'選択銘柄')+'から登録（処方の確認・規格設定は別途）</div>':''}</div>
        <button type="button" class="btn danger patient-med-del" data-id="${esc(item.id)}">一覧から削除</button></div>
      <div class="patient-med-glance">
        <div><b>薬効</b><span class="patient-med-glance-effect">${esc(text.effect||'未登録')}</span></div>
@@ -1713,13 +1722,25 @@ async function changePatientMedication(action,ident){
   if(patient._new){inform('先に基本タブで氏名または患者IDを入力して保存してください。');return;}
   if(patient.medications!=null&&!Array.isArray(patient.medications)){inform('登録済みデータの形式が不正です。変更は行いません。');return;}
   const prev=medRows(patient).slice();let next;
-  if(action==='add'){
-    if(!Number.isSafeInteger(ident)||ident<0||ident>=(state.drugs||[]).length){inform('薬剤をもう一度検索してください。');return;}
-    const item=medSnapshot(state.drugs[ident]);
+  if(action==='add'||action==='add-brand'){
+    let item,origin=null;
+    if(action==='add-brand'){
+      const resolved=window.RX045?.resolve(state.drugs||[],ident);
+      if(!resolved){inform('選択した銘柄を確認できません。薬剤を再検索してください。');return;}
+      item=resolved.drug;
+      origin=resolved.origin;
+      // The drug master is NOT a prescription. Never infer substitution.
+      if(!confirm('「'+item['薬名']+'」（'+resolved.label+'）を患者の処方薬一覧に登録します。'+
+        '\n電子カルテなどの実際の処方薬名と一致することを確認しましたか？'+
+        '\n\n規格・薬価・1日量・定期／頓服区分は自動確定しません。'))return;
+    }else{
+      if(!Number.isSafeInteger(ident)||ident<0||ident>=(state.drugs||[]).length){inform('薬剤をもう一度検索してください。');return;}
+      item=medSnapshot(state.drugs[ident]);
+    }
     if(!item['薬名']){inform('薬名が空欄の候補は登録できません。');return;}
     if(prev.some(r=>medSignature(r?.drug)===medSignature(item))){inform('同じ薬剤情報はすでに登録されています。');return;}
     if(prev.length>=100){inform('一人の患者には100件まで登録できます。');return;}
-    next=[...prev,{id:uid(),drug:item,addedAt:nowISO()}];
+    next=[...prev,{id:uid(),drug:item,addedAt:nowISO(),...(origin?{rx045Origin:origin}:{})}];
   }else if(action==='pricing'){
     const row=prev.find(x=>x.id===ident?.id);
     if(!row){inform('対象の登録薬が見つかりません。');return;}
@@ -1752,7 +1773,7 @@ async function changePatientMedication(action,ident){
   try{
     if(selectedPatient!==patient||!key||!state)throw new Error('患者またはロック状態が変わりました。');
     await save();
-    if(selectedPatient===patient){drawPatientMedicationList();inform(action==='add'?'登録しました。薬名と薬効・後発品を一覧で確認できます。':action==='pricing'?'規格・参考薬価・1日数量を保存しました。':'患者の一覧から削除しました。');}
+    if(selectedPatient===patient){drawPatientMedicationList();inform(action==='add'||action==='add-brand'?'薬剤を登録しました。規格・薬価・1日量は必要に応じて別途確認してください。':action==='pricing'?'規格・参考薬価・1日数量を保存しました。':'患者の一覧から削除しました。');}
   }catch(e){
     patient.medications=prev;
     if(selectedPatient===patient){drawPatientMedicationList();inform('保存失敗のため元に戻しました：'+String(e.message||e).slice(0,120));}

@@ -4,12 +4,21 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261027-journal-print-jp01';
+const CACHE=CACHE_PREFIX+'20261028-rx046-integration-prep';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
-  './styles.css?v=mvp01-sec13-20261027-journal-print-jp01',
-  './app.js?v=mvp01-sec13-20261027-journal-print-jp01',
+  './styles.css?v=jp01-rx046-20261028',
+  './app.js?v=jp01-rx046-20261028',
+  './rx035-addon.js?v=jp01-rx046-20261028',
+  './rx036-master-editor.js?v=jp01-rx046-20261028',
+  './rx037-structured-editor.js?v=jp01-rx046-20261028',
+  './rx038-multiple-originals.js?v=jp01-rx046-20261028',
+  './rx039-layout.js?v=jp01-rx046-20261028',
+  './rx042-five-line-list.js?v=jp01-rx046-20261028',
+  './rx043-compact-editor.js?v=jp01-rx046-20261028',
+  './rx045-patient-brand-search.js?v=jp01-rx046-20261028',
+  './rx046-strength-sort.js?v=jp01-rx046-20261028',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
