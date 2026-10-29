@@ -4,7 +4,7 @@ const enc=new TextEncoder(), dec=new TextDecoder();
 const DB_NAME='mswdb_mvp01_clinical_v1', STORE='kv'; // Separate, draft-only database; never touch installed MVP01 data.
 let db=null,key=null,state=null,meta=null,screen='patients',selectedPatient=null,activeTab='basic',lockTimer=null;
 let sanThereseOnly=false; // Volatile list-view filter only; patient flags are stored in encrypted state.
-const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02-NAVFIX1-JP01-RX046-PREP';
+const APP_VERSION='1.0.21-MVP01-sec13-RC3M-PILOT-BASIC-FIX1-RX02-NAVFIX1-JP01-RX046-PREP-KANA01';
 // LIMITED OPERATIONAL PILOT. Clinical authorization is determined by employer and operator, not by this program.
 // Patient data must never be uploaded to ChatGPT or GitHub. Local encryption does not replace institutional controls.
 const DEPLOYMENT_POLICY=Object.freeze({
@@ -148,7 +148,7 @@ function bindMasterSelects(root=document){
   });
 }
 
-const legacyFields=['ADL調査日','DM注','ＩＤ','KP','KP職業','KP年齢','MMT右下','MMT右上','MMT左下','MMT左上','かかりつけ','ケアマネ・施設','コール','スケール','スケール：点数','ベッド番号','リハ状況','移乗','移動器具','家屋','家構','介護度','介護連携','介護情報','検討会','高次脳','氏名','主治医','術式','食事','食事：介助量','水分：トロミ','睡眠','睡眠：薬剤','退院支援','調査日','入院元','入院時介護度','入院日','入院日数','排泄','排泄：介助量','排泄：尿便意','排泄：利用','番号','備考','病名','保険','本人職業','問題行動'];
+const legacyFields=['フリガナ','ADL調査日','DM注','ＩＤ','KP','KP職業','KP年齢','MMT右下','MMT右上','MMT左下','MMT左上','かかりつけ','ケアマネ・施設','コール','スケール','スケール：点数','ベッド番号','リハ状況','移乗','移動器具','家屋','家構','介護度','介護連携','介護情報','検討会','高次脳','氏名','主治医','術式','食事','食事：介助量','水分：トロミ','睡眠','睡眠：薬剤','退院支援','調査日','入院元','入院時介護度','入院日','入院日数','排泄','排泄：介助量','排泄：尿便意','排泄：利用','番号','備考','病名','保険','本人職業','問題行動'];
 const groups={
   basic:['ベッド番号','ＩＤ','氏名','入院日','主治医','病名','保険','本人職業','術式','入院元','かかりつけ','家構'],
   care:['KP','KP職業','KP年齢','介護度','入院時介護度','介護連携','ケアマネ・施設','検討会','退院支援'],
@@ -426,14 +426,116 @@ function activePatients(){return state.patients.filter(p=>!p.dischargeDate)}
 function getStatus(p){return p.status||'未設定'}
 function statusTag(s){const c=s.includes('要')?'red':s.includes('決定')?'green':s.includes('施設')?'purple':s==='未設定'?'':'orange';return `<span class="tag ${c}">${esc(s)}</span>`}
 function sanThereseTargets(){return activePatients().filter(p=>p.sanThereseMeeting===true)}
+
+// KANA-SEARCH-STAGE: Local, limited offline readings are *candidates*, never authoritative.
+// No network name lookup; unknown or ambiguous names remain manually editable and unconfirmed.
+const LOCAL_KANA_SURNAMES=Object.freeze({
+ '山田':'ヤマダ','佐藤':'サトウ','鈴木':'スズキ','高橋':'タカハシ','田中':'タナカ',
+ '伊藤':'イトウ','渡辺':'ワタナベ','渡邊':'ワタナベ','小林':'コバヤシ','中村':'ナカムラ',
+ '加藤':'カトウ','吉田':'ヨシダ','山本':'ヤマモト','松本':'マツモト','井上':'イノウエ',
+ '木村':'キムラ','林':'ハヤシ','清水':'シミズ','山崎':'ヤマザキ','山口':'ヤマグチ',
+ '斎藤':'サイトウ','斉藤':'サイトウ','阿部':'アベ','池田':'イケダ','橋本':'ハシモト',
+ '森':'モリ','石川':'イシカワ','前田':'マエダ','藤田':'フジタ','後藤':'ゴトウ',
+ '岡田':'オカダ','長谷川':'ハセガワ','村上':'ムラカミ','近藤':'コンドウ','石井':'イシイ',
+ '坂本':'サカモト','遠藤':'エンドウ','青木':'アオキ','藤井':'フジイ','西村':'ニシムラ'
+});
+const LOCAL_KANA_GIVEN=Object.freeze({
+ '太郎':'タロウ','花子':'ハナコ','一郎':'イチロウ','二郎':'ジロウ',
+ '健':'ケン','健一':'ケンイチ','美咲':'ミサキ','葵':'アオイ','陽子':'ヨウコ',
+ '洋子':'ヨウコ','恵子':'ケイコ','和子':'カズコ','幸子':'サチコ',
+ '美智子':'ミチコ','博':'ヒロシ','浩':'ヒロシ','誠':'マコト','豊':'ユタカ',
+ '明':'アキラ','優子':'ユウコ','直子':'ナオコ','和夫':'カズオ','洋':'ヒロシ',
+ '由美':'ユミ','美香':'ミカ','翔':'ショウ','大輔':'ダイスケ'
+});
+function kataNormalized(text){
+ return String(text||'').normalize('NFKC').replace(/[ぁ-ゖ]/g,c=>String.fromCharCode(c.charCodeAt(0)+96)).replace(/[\s　]+/g,'').toLowerCase();
+}
+function furiganaSuggestion(name){
+ const raw=String(name||'').trim().normalize('NFKC');
+ if(!raw)return '';
+ if(/^[ァ-ヿぁ-ゖー\s　]+$/.test(raw))return kataNormalized(raw).toUpperCase();
+ const parts=raw.split(/[\s　]+/).filter(Boolean);
+ let family='',given='';
+ if(parts.length===2){family=parts[0];given=parts[1];}
+ else if(parts.length===1){
+  const surname=Object.keys(LOCAL_KANA_SURNAMES).sort((a,b)=>b.length-a.length).find(s=>parts[0].startsWith(s));
+  if(surname){family=surname;given=parts[0].slice(surname.length);}
+ }
+ if(!family||!given||!LOCAL_KANA_SURNAMES[family]||!LOCAL_KANA_GIVEN[given])return '';
+ return LOCAL_KANA_SURNAMES[family]+' '+LOCAL_KANA_GIVEN[given];
+}
+function basicFuriganaHtml(){
+ const p=selectedPatient;return '<div class="field basic-field basic-furigana-field">'+
+ '<label>フリガナ <span class="furigana-status" id="furiganaStatus">要確認</span></label>'+
+ '<div class="furigana-entry-control">'+
+ '<input type="text" data-field="フリガナ" autocomplete="off" placeholder="自動候補／手入力" value="'+esc(p.data?.['フリガナ']||'')+'">'+
+ '<button type="button" class="furigana-confirm" id="furiganaConfirm" aria-label="フリガナの読みを確認して保存" title="フリガナを確認して保存">確認</button></div></div>';
+}
+function bindBasicFurigana(root){
+ const name=root.querySelector('[data-field="氏名"]');
+ const kana=root.querySelector('[data-field="フリガナ"]');
+ const status=root.querySelector('#furiganaStatus');
+ const confirmButton=root.querySelector('#furiganaConfirm');
+ if(!name||!kana||!status||!confirmButton||!selectedPatient)return;
+ const p=selectedPatient;
+ let typed=false;
+ function refresh(){
+  const currentName=String(name.value||'').trim();
+  const confirmed=!!p.furiganaConfirmed&&p.furiganaConfirmedFor===currentName&&kana.value.trim()===String(p.data?.['フリガナ']||'').trim()&&!typed;
+  kana.dataset.furiganaConfirmed=confirmed?'yes':'no';
+  status.textContent=confirmed?'確認済み':(kana.value.trim()?'要確認':'未入力');
+  status.dataset.confirmed=confirmed?'yes':'no';
+  confirmButton.disabled=confirmed||!kana.value.trim()||!currentName;
+  confirmButton.textContent=confirmed?'済':'確認';
+  confirmButton.setAttribute('aria-label',confirmed?'フリガナ確認済み':'フリガナの読みを確認して保存');
+ }
+ function propose(){
+  // Confirmed readings are NEVER overwritten, even when a name changes.
+  if(p.furiganaConfirmed&&p.data?.['フリガナ']){refresh();return;}
+  if(typed){refresh();return;}
+  const suggested=furiganaSuggestion(name.value);
+  kana.value=suggested;
+  refresh();
+ }
+ if(!kana.value.trim())propose();else refresh();
+ name.addEventListener('input',e=>{if(!e.isComposing)propose();});
+ name.addEventListener('compositionend',propose);
+ kana.addEventListener('input',e=>{if(e.isComposing)return;typed=true;refresh();});
+ kana.addEventListener('compositionend',()=>{typed=true;refresh();});
+ confirmButton.onclick=()=>{
+  const reading=kana.value.trim();
+  const patientName=name.value.trim();
+  if(!patientName||!reading)return;
+  // Human confirmation required, never infer correctness automatically.
+  p.furiganaConfirmed=true;
+  p.furiganaConfirmedFor=patientName;
+  typed=false;
+  kana.dataset.furiganaConfirmed='yes';
+  kana.dispatchEvent(new Event('change',{bubbles:true}));
+  // Also persist review flags when the kana itself hasn't changed.
+  patientChangeRev++;schedulePatientAutoSave();
+  refresh();
+ };
+}
+
+
+let patientListSearchQuery='',patientListWard='';
+function updateStickyPatientSearch(){
+ const h=document.querySelector('.topbar')?.getBoundingClientRect()?.height||62;
+ document.documentElement.style.setProperty('--patient-search-top',Math.ceil(h)+'px');
+ if(!window.__mswSearchResizeBound){window.__mswSearchResizeBound=true;window.addEventListener('resize',updateStickyPatientSearch,{passive:true});}
+}
 function renderPatients(){
   const ps=activePatients(),targets=sanThereseTargets();
-  $('#main').innerHTML=`<div class="hero"><div><h1>入院患者</h1><p>在院患者を管理します。退院確定後の患者は「退院患者記録」から確認できます。</p></div><div class="spacer"></div><button class="btn secondary" id="openArchive">退院患者記録</button><button class="btn" id="newP">＋患者</button></div><div class="kpis"><div class="kpi"><b>${ps.length}</b><span>在院患者</span></div><div class="kpi"><b>${ps.filter(p=>p.tasks?.some(t=>!t.done)).length}</b><span>要対応あり</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('施設')).length}</b><span>施設調整中</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('決定')).length}</b><span>退院先決定</span></div></div><div class="santherese-nav" role="group" aria-label="患者一覧の切り替え"><button type="button" class="btn secondary ${sanThereseOnly?'':'is-selected'}" id="showAllPatients" aria-pressed="${!sanThereseOnly}">🏥 全患者のベッドマップ</button><button type="button" class="btn secondary santherese-filter ${sanThereseOnly?'is-selected':''}" id="showSanTherese" aria-pressed="${sanThereseOnly}">🟠 サン・テレーズ検討会 ${targets.length}人</button></div><div class="toolbar"><input id="q" placeholder="氏名・病名・病床で検索" aria-label="患者検索"><select id="ward"><option value="">全病棟</option><option value="一般病棟">一般病棟</option><option value="ICU">ICU</option><option value="その他">その他・未配置</option></select><button class="btn secondary" id="print">朝一患者一覧を印刷</button></div><div id="patientList"></div>`;
+  $('#main').innerHTML=`<div class="hero"><div><h1>入院患者</h1><p>在院患者を管理します。退院確定後の患者は「退院患者記録」から確認できます。</p></div><div class="spacer"></div><button class="btn secondary" id="openArchive">退院患者記録</button><button class="btn" id="newP">＋患者</button></div><div class="kpis"><div class="kpi"><b>${ps.length}</b><span>在院患者</span></div><div class="kpi"><b>${ps.filter(p=>p.tasks?.some(t=>!t.done)).length}</b><span>要対応あり</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('施設')).length}</b><span>施設調整中</span></div><div class="kpi"><b>${ps.filter(p=>getStatus(p).includes('決定')).length}</b><span>退院先決定</span></div></div><div class="santherese-nav" role="group" aria-label="患者一覧の切り替え"><button type="button" class="btn secondary ${sanThereseOnly?'':'is-selected'}" id="showAllPatients" aria-pressed="${!sanThereseOnly}">🏥 全患者のベッドマップ</button><button type="button" class="btn secondary santherese-filter ${sanThereseOnly?'is-selected':''}" id="showSanTherese" aria-pressed="${sanThereseOnly}">🟠 サン・テレーズ検討会 ${targets.length}人</button></div><div class="toolbar patient-search-toolbar"><input id="q" type="search" autocomplete="off" placeholder="漢字・フリガナ・ベッド番号で検索" aria-label="患者検索" value="${esc(patientListSearchQuery)}"><button type="button" class="btn secondary patient-search-clear" id="clearPatientSearch">消去</button><select id="ward"><option value="">全病棟</option><option value="一般病棟">一般病棟</option><option value="ICU">ICU</option><option value="その他">その他・未配置</option></select><button class="btn secondary" id="print">朝一患者一覧を印刷</button></div><div id="patientList"></div>`;
   $('#openArchive').onclick=()=>{screen='archive';render()};
   $('#newP').onclick=()=>openPatient(newPatient());
   $('#print').onclick=printMorningList;
-  $('#q').oninput=drawPatientList;
-  $('#ward').onchange=drawPatientList;
+  $('#q').oninput=()=>{patientListSearchQuery=$('#q').value;drawPatientList()};
+  $('#clearPatientSearch').onclick=()=>{patientListSearchQuery='';$('#q').value='';drawPatientList();$('#q').focus({preventScroll:true})};
+  $('#ward').value=patientListWard;
+  $('#ward').onchange=()=>{patientListWard=$('#ward').value;drawPatientList()};
+  updateStickyPatientSearch();
   $('#showAllPatients').onclick=()=>{sanThereseOnly=false;renderPatients()};
   $('#showSanTherese').onclick=()=>{sanThereseOnly=true;renderPatients()};
   drawPatientList();
@@ -536,10 +638,30 @@ function drawPatientList(){const q=($('#q')?.value||'').trim().toLowerCase(),w=$
     return;
   }if(q&&!filtered.length){root.innerHTML='<div class="empty">該当する患者がいません</div>';return}
   const general=layoutBedNumbers(BED_LAYOUT,all),icu=layoutBedNumbers(ICU_LAYOUT,all);let html='';
+  if(q){
+    // During search render ONLY rooms containing matching patients. Show a complete
+    // matching room (including its other occupied / empty beds) for safe bed moves.
+    const hitBeds=new Set(filtered.map(p=>normalizeBed(p.data?.['ベッド番号'])));
+    const hasHit=room=>room.beds.some(b=>hitBeds.has(normalizeBed(b)));
+    const generalHits=general.filter(hasHit),icuHits=icu.filter(hasHit);
+    if((!w||w==='一般病棟')&&generalHits.length){
+      html+='<section class="map-section"><div class="map-section-title"><strong>検索結果の病室（一般病棟）</strong><span class="count">'+generalHits.length+'室</span></div><div class="room-map general-room-map search-room-map">'+generalHits.map(room=>'<div class="room-map-item standard-room">'+roomMapHtml(room,all,'')+'</div>').join('')+'</div></section>';
+    }
+    if((!w||w==='ICU')&&icuHits.length){
+      html+='<section class="map-section"><div class="map-section-title"><strong>検索結果の病室（ICU）</strong><span class="count">'+icuHits.length+'室</span></div><div class="room-map icu-map">'+icuHits.map(room=>roomMapHtml(room,all,'')).join('')+'</div></section>';
+    }
+  }else{
   if(!w||w==='一般病棟'){html+=`<section class="map-section"><div class="map-section-title"><div><strong>一般病棟</strong><span>病室・ベッドマップ</span></div><span class="count">${general.reduce((n,r)=>n+r.beds.length,0)}床</span></div><div class="room-map general-room-map">${general.filter(room=>!['208','210','211','212','213'].includes(room.room)).map(room=>`<div class="room-map-item standard-room">${roomMapHtml(room,filtered,q)}</div>`).join('')}<div class="compact-room-guide">208・210・211・212・213号室</div><div class="compact-room-scroll" role="region" aria-label="208・210・211・212・213号室（横スクロール可能）" tabindex="0"><div class="compact-room-row">${general.filter(room=>['208','210','211','212','213'].includes(room.room)).map(room=>`<div class="room-map-item compact-room ${room.beds.length===2?'two-bed-room':''}">${roomMapHtml(room,filtered,q)}</div>`).join('')}</div></div></div></section>`}
   if(!w||w==='ICU'){html+=`<section class="map-section"><div class="map-section-title"><div><strong>ICU</strong><span>集中治療室</span></div><span class="count">${icu.reduce((n,r)=>n+r.beds.length,0)}床</span></div><div class="room-map icu-map">${icu.map(room=>roomMapHtml(room,filtered,q,true)).join('')}</div></section>`}
+  }
   const other=filtered.filter(p=>!isMappedBed(p.data['ベッド番号']));if((!w||w==='その他')&&other.length)html+=`<section class="map-section"><style>@media(max-width:900px){.unplaced-patient-grid{grid-template-columns:repeat(3,minmax(0,1fr))!important}}@media(max-width:540px){.unplaced-patient-grid{grid-template-columns:repeat(2,minmax(0,1fr))!important}}</style><div class="map-section-title"><div><strong>その他・未配置</strong><span>標準マップ外の患者</span></div><span class="count">${other.length}人</span></div><div class="room-map unplaced-patient-grid" style="display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:8px">${other.map(p=>patientBedHtml(p.data['ベッド番号']||'未配置',[p])).join('')}</div></section>`;
-  root.innerHTML=html||'<div class="empty">該当する患者がいません</div>';bindPatientMapEvents()}
+  root.innerHTML=html||'<div class="empty">該当する患者がいません</div>';
+  if(q){const hits=new Set(filtered.map(p=>p.id));
+    root.querySelectorAll('.occupied-bed[data-id]').forEach(el=>{if(hits.has(el.dataset.id))el.classList.add('search-bed-match')});
+    const hitBeds=new Set(filtered.map(p=>normalizeBed(p.data?.['ベッド番号'])));
+    root.querySelectorAll('.duplicate-bed[data-bed]').forEach(el=>{if(hitBeds.has(normalizeBed(el.dataset.bed)))el.classList.add('search-bed-match')});
+  }
+  bindPatientMapEvents()}
 const BED_LAYOUT=[
   {room:'201',beds:[1,2,3,4,5,6]},
   {room:'202',beds:[1,2,3,4,5,6]},
@@ -564,7 +686,7 @@ function normalizeBed(v){return String(v||'').trim().replace(/\s+/g,'').replace(
 function bedKey(room,n){return n===''?room:`${room}-${n}`}
 function isMappedBed(v){const b=normalizeBed(v);return [...BED_LAYOUT,...ICU_LAYOUT].some(room=>room.beds.some(n=>normalizeBed(bedKey(room.room,n))===b))}
 function wardForBed(v){const b=normalizeBed(v);if(!isMappedBed(b))return'その他';return b.startsWith('ICU')?'ICU':'一般病棟'}
-function patientMatches(p,q){if(!q)return true;return[p.data['氏名'],p.data['病名'],p.data['ベッド番号'],p.data['主治医']].join(' ').toLowerCase().includes(q)}
+function patientMatches(p,q){if(!q)return true;const d=p.data||{};const hay=[d['氏名'],d['フリガナ'],d['病名'],d['ベッド番号'],d['主治医']].join(' ');return kataNormalized(hay).includes(kataNormalized(q))}
 function patientsForBed(bed,patients=activePatients()){const key=normalizeBed(bed);return patients.filter(p=>normalizeBed(p.data['ベッド番号'])===key)}
 function layoutBedNumbers(layout,patients){
   // Fixed bed map: imported patient bed numbers never create new bed slots.
@@ -639,6 +761,7 @@ function capturePatientForm(){
     const f=el.dataset.field,v=el.value;
     if(isProhibitedContactField(f))return;
     if(v==='__add__')return; // A temporary master-registration choice is not patient data.
+    if(f==='フリガナ'&&el.dataset.furiganaConfirmed!=='yes')return;
     if(String(p.data[f]??'')!==String(v)){p.data[f]=v;changed=true}
   });
   const meeting=$('#sanThereseCheck');if(meeting&&Boolean(p.sanThereseMeeting) !== meeting.checked){p.sanThereseMeeting=meeting.checked;changed=true}
@@ -793,7 +916,7 @@ function renderTab(){const root=$('#tabbody'),p=selectedPatient;if(activeTab==='
 function basicFieldHtml(field,label,{multiline=false,rows=2}={}){
   const p=selectedPatient,v=p.data?.[field]??'';
   if(field==='ベッド番号')return `<div class="field basic-field"><label>ベッド番号</label><input type="hidden" data-field="ベッド番号" id="patientBedValue" value="${esc(v)}"><button type="button" class="btn secondary basic-bed-picker" id="patientBedPick">${esc(v||'その他・未配置')} ▾</button></div>`;
-  if(field==='入院日数')return `<div class="field basic-field"><label>入院日数（自動）</label><div id="basicAdmissionDays" class="basic-readonly" aria-live="polite">${esc(daysSince(p.data['入院日'])||p.data['入院日数']||'—')}${daysSince(p.data['入院日'])||p.data['入院日数']?'日':''}</div></div>`;
+  if(field==='入院日数')return `<div class="field basic-field"><label>入院日数</label><div id="basicAdmissionDays" class="basic-readonly" aria-live="polite">${esc(daysSince(p.data['入院日'])||p.data['入院日数']||'—')}${daysSince(p.data['入院日'])||p.data['入院日数']?'日':''}</div></div>`;
   const placeholder=field==='家構'?'例：2同別':field==='市町村'?'例：小美玉（市町村名の略称可・番地不可）':field==='介護情報'?'ケアマネ・介護サービスなど':'';
   const common=`data-field="${esc(field)}" aria-label="${esc(label)}" placeholder="${esc(placeholder)}"`;
   if(multiline)return `<div class="field basic-field"><label>${esc(label)}</label><textarea ${common} rows="${rows}">${esc(v)}</textarea></div>`;
@@ -959,10 +1082,10 @@ function renderBasicDashboard(){
     <section class="basic-information" aria-label="患者基本情報">
       <div class="basic-form-rows">
         <div class="basic-row basic-r1">${basicFieldHtml('ベッド番号','ベッド番号')}${basicFieldHtml('入院日','入院日')}${basicFieldHtml('入院日数','入院日数')}</div>
-        <div class="basic-row basic-r2">${basicFieldHtml('ＩＤ','ID')}${basicFieldHtml('氏名','氏名')}${basicFieldHtml('市町村','住所（市町村のみ）')}${basicFieldHtml('家構','家族構成')}</div>
+        <div class="basic-row basic-r2">${basicFieldHtml('ＩＤ','ID')}${basicFieldHtml('氏名','氏名')}${basicFuriganaHtml()}${basicFieldHtml('市町村','住所')}${basicFieldHtml('家構','家族構成')}</div>
         <div class="basic-row basic-r3">${basicFieldHtml('主治医','主治医')}${basicFieldHtml('病名','病名')}</div>
         <div class="basic-row basic-r4">${basicFieldHtml('介護度','介護度')}${basicFieldHtml('調査日','調査日')}</div>
-        <div class="basic-row basic-r5">${basicFieldHtml('介護情報','介護情報（広め）',{multiline:true,rows:2})}</div>
+        <div class="basic-row basic-r5">${basicFieldHtml('介護情報','介護情報',{multiline:true,rows:2})}</div>
         <div class="basic-row basic-r6">${basicFieldHtml('入院元','入院元')}</div>
         <div class="basic-row basic-r7">${basicFieldHtml('備考','備考',{multiline:true,rows:2})}</div>
       </div>
@@ -986,6 +1109,7 @@ function renderBasicDashboard(){
   bindMasterSelects(root);
   bindBasicComboInputs(root);
   bindSurveyDateClear(root);
+  bindBasicFurigana(root);
   const input=root.querySelector('[data-field="入院日"]');
   input?.addEventListener('input',()=>{
     const el=$('#basicAdmissionDays');if(el)el.textContent=(daysSince(input.value)||'—')+(daysSince(input.value)?'日':'');
