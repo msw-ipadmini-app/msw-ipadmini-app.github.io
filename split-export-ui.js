@@ -17,7 +17,16 @@ const flow=Object.freeze({
  isImportActive:()=>importBusy,
  tryBeginImport:()=>{if(importBusy||processing||item)return false;importBusy=true;update();return true},
  finishImport:()=>{importBusy=false;update()},
- refresh:()=>update()
+ refresh:()=>update(),
+ // Web Locks coordinate split operations among Safari tabs sharing this origin.
+ // Only one split flow may run. Fail closed if the browser lacks this API.
+ runExclusive:async work=>{
+  if(!navigator.locks?.request)throw Error('複数画面の安全制御を使用できません。Safariを更新してから実行してください');
+  return navigator.locks.request('msw-clinical-split-backup-v1',{mode:'exclusive',ifAvailable:true},async lock=>{
+   if(!lock)throw Error('別のSafari画面で分割バックアップを操作中です。そちらを終了してから再試行してください');
+   return work();
+  });
+ }
 });
 Object.defineProperty(window,'MSWSplitUIFlow',{value:flow,configurable:false});
 try{
@@ -111,7 +120,7 @@ async function run(){
  processing=true;number=0;priorInterrupted=false;cancelRequested=false;
  setStatus('running','患者の暗号化記録を確認しています…');
  try{
-  const result=await MSWExportBridge.run(async(desc,blob)=>{
+  const result=await flow.runExclusive(()=>MSWExportBridge.run(async(desc,blob)=>{
    if(cancelRequested)throw Error('書き出し中断');
    number++;
    if(item)throw Error('保存待ちのパートが重複しました');
@@ -122,7 +131,7 @@ async function run(){
    });
    pendingReject=null;
    if(cancelRequested)throw Error('書き出し中断');
-  });
+  }));
   if(cancelRequested)throw Error('書き出し中断');
   item={kind:'manifest',name:result.name,blob:result.blob,saving:false};
   setStatus('pending','写真 '+result.photoCount+'枚、パート '+result.partCount+'個のダウンロード操作が終わりました。最後に管理ファイルを保存してください。');
