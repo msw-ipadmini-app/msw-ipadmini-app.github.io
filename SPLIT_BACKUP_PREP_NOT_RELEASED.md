@@ -55,3 +55,13 @@
 - 独立架空試験v02 `https://piimanbokumetsu-code.github.io/msw-v1010-test/split-full-restore-isolated-20261030/?v=02` は候補の復元処理JSと同じblob SHAで7項目（正常復元・間違ったPIN・改ざん・写真AES-GCM・取り消し・コミット中断・コミット後画面エラー）を検証する。GitHub配置とJS構文は確認済みだが、iPad mini実行結果は未確認。
 - **導入の残工程を固定**：①この実コードの独立安全試験合格→②未公開統合（`index.html`に形式／書出／選択／読込UIのJS配線、各SRIと`sw.js`キャッシュを正確に更新、旧単体`.mswdb`の動作を維持）→③iPad miniで統合候補の最終確認、ユーザー承認後に初めて本番公開を検討。必要性のない新試験を増やさない。
 - 現時点でこのブランチの`index.html`と`sw.js`は変更していない。現行本番`main`と既存患者・写真・PIN・105.2MBバックアップは保護する。
+
+
+## 2026-10-30 iPad 7/7合格後：未公開統合コードの配線完了
+- 架空患者とAES-GCM写真2枚を用いた独立復元安全試験v03で、ユーザーがiPad mini実機 **7/7合格** を確認（2026-10-30）。正常復元、誤PIN・SHA改ざん・写真認証失敗、取り消し、トランザクション中断、復元後UI例外の全項目。既に合格した項目を繰り返さない。
+- **未公開ブランチ上のみ** `index.html` に新JS6件を順番に接続：`split-format.js`→`split-export-bridge.js`→`split-import-bridge.js`→`split-file-selection.js`→`split-export-ui.js`→`split-import-ui.js`。全件SHA-384 SRIと固定版パラメータ `split-prep-20261030-integrated-v01` を付与（commit `3072596c48610a4eb8dde094d75ec752b3e709a8`）。
+- 同ブランチ `sw.js` のオフラインキャッシュ一覧に6件を同じ固定版パラメータで追加し、キャッシュ名を改訂（commit `03c0207b9a30d2838b3beb49bd844bac4b542778`）。従来の単一`.mswdb`の書出・復元関連処理および既存RX/JOURNAL/印刷JSを変更せず残した。
+- 静的再取得でJS構文、6件のindex/SRI/キャッシュ対応、各JSの読み込み順、旧単一バックアップの操作UI残存を確認。**ここまでの確認はGitHubコードの整合性であり、統合後アプリの起動・復元をiPad実機で検証したことにはならない。**
+- 現行本番 `main` の `index.html` SHA `24aacb61e0f10c30db8099069b760a97af0d8fb8`、`sw.js` SHA `d9cb1596772118e3e6fb138724e574822344b1f9` を再取得し、未公開側と別であることを確認。**本番mainには変更を書き込んでいない。**
+- 残る唯一の大工程：本番と別URL・別IndexedDBの統合候補をiPad miniで検証する。元アプリ約198KBを独立テスト環境へコピーするGitHub操作が接続の安全性チェックによりブロックされたため、独立統合テストURLは未完成。未検証のまま本番mainへ反映しない。GitHubで安全なテスト配置手段が整うまで、ユーザーに新たな試験操作は求めない。
+- 本番患者データ・写真・暗証番号・既存105.2MBの`.mswdb`バックアップは未変更。既存の実機合格済み13MiB/136MiBファイルと7/7の検証は再度実施させない。
