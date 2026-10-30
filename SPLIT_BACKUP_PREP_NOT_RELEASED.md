@@ -120,3 +120,14 @@
 - コード commit `36ffdd233b39e1af133d2ac84307aa25b7aca15f`。SHA-384 SRI `split-import-bridge.js` = `sha384-N3j7Fuq7p8lpRl8FO1K/yIs2UWh00WY+6rY7N/9faPLwqPTWCGE++EfY6PSvK208`（標準 `abc` と既存 `split-format.js` で検証）。`index.html` と `sw.js` の6件を `split-prep-20261030-integrated-v07` に統一、SWキャッシュ `20261030-kana01-split-prep-v07`。コミットindex `306092c24a0c7313e56616449bd14ec5b05e7882`、SW `836e17a75657aa79276d8232bbf36b913424a257`。
 - GitHub再取得で全6 JSの構文・SRI・SW資産と読み込み順が一致。既存 `app.js` の単体 `.mswdb` 生成/復元を維持、SHA `d47702a132ca2c8f1d609166cda4d72b2d3872fc` 不変、公開 `main` のindex/SWも従前のSHAから不変。
 - **本番導入は依然未完了**：本番アプリ全体の隔離URL・別DBでのiPad実機起動、既存機能との共存、大容量完全AES-GCM写真復元は追加検証が必要。従前のGitHub接続の安全フィルターがブロックした full-app.js の別リポジトリ複製は迂回しない。公開main、患者データ、PIN、既存バックアップは変更禁止。導入準備の推定98%据え置き。
+
+
+## 2026-10-30 未公開統合v08：Safari非表示時の復元中断（置き換え前のみ）
+- 重要な安全上の弱点を発見：現行`app.js`はバックグラウンド移行時に患者情報を即座に隠し`maintenanceDone`を待ってロックする。一方で新しい分割復元は多パートSHA-256、写真AES-GCM復号、IndexedDB一時保存の完了まで長時間を要しうる。別画面に切り替わっても、患者データの置き換え処理前なら途中段階で確実に中断する必要があった。
+- 未公開`split-import-ui.js`に`AbortController`を導入。`visibilitychange:hidden`または`pagehide`で中断を通知。例外を明確に分類する`AbortError`を表示し、イベントリスナーを`finally`で解除する。既存のWeb Locksによる複数タブ排他は維持。commit`59a23bb76225ce2eef527622902e6a44cd9f63ba`。
+- 未公開`split-format.js`の`MSWSplitV04.verify`に互換性を維持した任意`checkAbort=()=>{}`を追加。管理ファイルの読込後・各パートの読込とSHA-256計算前後・患者索引照合前後で中断を確認。commit`4c3de897094fbb8efbee424752e23fe133c577c2`。
+- 未公開`split-import-bridge.js`は互換性を維持して第5引数`signal=null`を追加。整合性確認・写真復号・一時保存・確認ダイアログ前後・`dataWriteTail`待ち後で中断検査。**一括IndexedDBトランザクションの開始後は「中断したから未変更」とは主張せず、実際のコミット結果に従って表示**する。エラー・中断時の`splitstage:`一時レコードだけの整理と`endMaintenance`は維持。commit`5281a122b03f9dea2c3671da7256b31ebd26f12d`。
+- 実`MSWSplitV04.verify`の中断フック模擬試験**4/4合格**。実`MSWImportBridge.run`と模擬保存領域を用いた**7/7合格**：開始前中断、ハッシュ照合中、写真復号中、写真一時保存中、置き換え承認取り消し、データ書込待機中、コミット開始後の中断通知では復元結果を維持。UI中断通知・リスナー解放も模擬確認。これらは**コード上の試験**でiPad実機でのバックグラウンド/容量限界試験ではない。最初の開始前中断では以前の`splitstage:`残留データの整理は次回復元開始時に実施する。
+- 更新した3JSのSHA-384 SRI（標準`abc`SHA-384ベクトルで照合）：`split-format.js` = `sha384-suMp8KD5r7zVhM/aN16QgJW2pCuVKPmFpq/lUlhG/PNmmhbfGNwM2u0xlc4Z+IEK`、`split-import-bridge.js` = `sha384-ahFKdw0+XJ0CtgivCU4nfpcKO8uSGTdTbzWV2ZmEOzybH3sBsWRm0vxLtA5qR4TW`、`split-import-ui.js` = `sha384-UleXeMqRLxQz9DN64k50vLLM6kdv3BevJot4f1dXhx44OxYnml2Je1Ij6H5PKGdP`。
+- `index.html`と`sw.js`の6件を`split-prep-20261030-integrated-v08`、SWキャッシュ`20261030-kana01-split-prep-v08`に更新。コミットindex`9533b04a71512eba2fdea1d397bafa61050f3b34`、SW`9f4371e604de727afcfc9653b86115756542c42f`。GitHub再取得で6/6 JS構文・SRI・SW一致、順序正常。旧単体`.mswdb`書出/復元が残り、元`app.js` SHA `d47702a132ca2c8f1d609166cda4d72b2d3872fc`不変、本番main index SHA`24aacb61e0f10c30db8099069b760a97af0d8fb8`/SW SHA`d9cb1596772118e3e6fb138724e574822344b1f9`不変。
+- **未完了ゲート継続**：フル本番アプリを独立URL/別IndexedDBで起動して旧機能と分割機能の共存を確認するiPad実機試験は未実施。安全フィルターで止められた別repoへの`app.js`複製を迂回しない。実患者のデータ/暗証/既存暗号バックアップ、公開mainは変更していない。ユーザーの明示承認前に公開せず、既に合格した架空試験は繰り返さない。導入準備の推定進捗は98％。
