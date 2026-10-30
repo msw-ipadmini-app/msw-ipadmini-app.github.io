@@ -1,6 +1,14 @@
 'use strict';
 const MSWImportBridge=(()=>{
 const prefix=run=>'splitstage:'+run+':';
+// Fail safely before commit when Safari hides the patient app during a restore.
+// Once the atomic transaction has begun, its success/abort determines the result.
+function requireForeground(signal){
+ if(signal?.aborted||(typeof document!=='undefined'&&document.visibilityState==='hidden')){
+  const e=Error('Safariが非表示になったため、患者データの置き換え前に復元を中断しました。ロック解除後に最初からやり直してください');
+  e.name='AbortError';throw e;
+ }
+}
 function refs(index){if(!Array.isArray(index?.patients))throw Error('患者索引が不正');const ids=new Set();for(const p of index.patients){if(!Array.isArray(p.attachments||[]))throw Error('写真一覧が不正');let g=0;const ord=new Set();for(const a of p.attachments||[]){if(!a||typeof a.id!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(a.id)||ids.has(a.id)||!['genogram','admission'].includes(a.type)||!Number.isSafeInteger(a.order)||a.order<0||a.order>100000)throw Error('写真ID・添付情報が不正');if(a.type==='genogram'&&++g>1)throw Error('ジェノグラム重複');if(a.type==='admission'){if(ord.has(a.order))throw Error('入院時写真の順序重複');ord.add(a.order)}ids.add(a.id)}}return [...ids]}
 async function clean(p){const keys=(await idbKeys()).filter(k=>typeof k==='string'&&k.startsWith(p));for(let i=0;i<keys.length;i+=50)await idbApplyChanges([],keys.slice(i,i+50))}
 // An estimate is advisory, not a promise of successful IndexedDB commits.
@@ -34,16 +42,18 @@ r.onerror=()=>{
 };
 r.onsuccess=()=>{const c=r.result;if(c){const id=String(c.key).slice(p.length);if(!expected.has(id)){reason='未知の写真が混在';tx.abort();return}s.put(c.value,photoKey(id));s.delete(c.key);count++;c.continue();return}if(count!==expected.size){reason='写真件数の不一致';tx.abort();return}for(const k of old)if(!expected.has(k.slice(6)))s.delete(k);s.put(core.meta,'meta');s.put(core.data,'data')};
 })}
-async function run(manifest,parts,pin,progress=()=>{}){
+async function run(manifest,parts,pin,progress=()=>{},signal=null){
 const action='分割バックアップ安全復元';await beginMaintenance(action);let stage='';
+const active=()=>requireForeground(signal);
 try{
+active();
 if(!manifest||!Array.isArray(parts)||parts.length>2001||!pin)throw Error('ファイルまたは暗証が不正');
 const m=JSON.parse(await manifest.text());if(m.format!=='MSWDB-SPLIT-V04'||!/^[0-9a-f]{24}$/.test(m.run))throw Error('管理ファイルの形式が不正');
 // After a Safari crash, earlier runs can leave large encrypted staging records.
 // Delete ONLY splitstage: temporary keys before a new attempt; never touch photo:/meta/data.
-stage=prefix(m.run);await clean('splitstage:');
+stage=prefix(m.run);await clean('splitstage:');active();
 let core=null,passKey=null,index=null,photoIds=[];
-const report=await MSWSplitV04.verify({manifestFile:manifest,partFiles:parts,getReferenceIds:async v=>{
+const report=await MSWSplitV04.verify({manifestFile:manifest,partFiles:parts,checkAbort:active,getReferenceIds:async v=>{
 core=v;
 try{passKey=await derive(pin,unb64(v.meta.salt))}
 catch(e){throw Error('バックアップの暗証鍵を準備できません。暗号情報の破損や端末の暗号処理をご確認ください')}
@@ -53,22 +63,36 @@ catch(e){throw Error('バックアップの暗証番号が違うか、認証情�
 if(check!==true&&check?.ok!==true)throw Error('バックアップの認証情報が不正です');
 try{index=await decryptObj(v.data,passKey)}
 catch(e){throw Error('暗証認証後、患者情報を復号できません。バックアップが破損している可能性があります')}
-photoIds=refs(index);return photoIds}});
+photoIds=refs(index);active();return photoIds}});
+active();
 // Keep the production restore privacy policy: omit prohibited structured fields.
 const privacyReduction=removeProhibitedContactFieldsFromState(index);
 const safeCore={meta:core.meta,data:privacyReduction.removed
   ?await encryptPatientIndex(index,passKey):core.data};
-await checkStageCapacity(m);
+await checkStageCapacity(m);active();
 const wanted=new Set(photoIds);let checked=0;
-for(const file of parts){const part=JSON.parse(await file.text());if(part.kind!=='photos')continue;
-for(const [id,cipher] of Object.entries(part.photos||{})){if(!wanted.has(id)||!cipher?.ct||!cipher?.iv)throw Error('写真レコードが不正');validateStoredPhoto(await decryptObj(cipher,passKey));await idbSet(stage+id,cipher);progress(++checked,report.photos)}}
+for(const file of parts){
+ active();const part=JSON.parse(await file.text());active();
+ if(part.kind!=='photos')continue;
+ for(const [id,cipher] of Object.entries(part.photos||{})){
+  active();
+  if(!wanted.has(id)||!cipher?.ct||!cipher?.iv)throw Error('写真レコードが不正');
+  const photo=await decryptObj(cipher,passKey);active();
+  validateStoredPhoto(photo);
+  await idbSet(stage+id,cipher);active();
+  progress(++checked,report.photos);
+ }
+}
+active();
 if(checked!==report.photos)throw Error('写真の検査枚数が不一致');
 const disclosure=privacyReduction.removed
   ?'旧バックアップの不要な構造化項目 '+privacyReduction.removed+'件（値あり '+privacyReduction.nonempty+'件）を除外して復元します。\n':'';
 if(!confirm('患者'+index.patients.length+'件／写真'+checked+'件を確認しました。\n'+disclosure+
   '写真や自由記述内の住所・連絡先は自動除去されません。\n現在の本番患者データを置き換えますか？'))
   return {cancelled:true};
-await dataWriteTail;await commit(stage,wanted,safeCore);
+await dataWriteTail;
+active(); // Last cancellation gate: after this line the atomic commit decides.
+await commit(stage,wanted,safeCore);
 // The IndexedDB replacement is committed at this point. Never report it as
 // "cancelled" or "old data unchanged" because a subsequent UI update fails.
 // Invalidate the old in-memory decrypted index before touching the DOM.
