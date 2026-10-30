@@ -33,19 +33,38 @@ panel.querySelector('#splitRestore').onclick=async()=>{if(busy)return;const mani
 const flow=window.MSWSplitUIFlow;
 if(!flow?.tryBeginImport()){out.textContent='分割書き出し中は復元できません。全パートと管理ファイルの保存操作を完了するか、作業を中断する場合はSafariで再読み込みしてください。';return}
 busy=true;
+const controller=new AbortController();
+const stopOnHide=()=>{if(document.visibilityState==='hidden')controller.abort()};
+const stopOnLeave=()=>controller.abort();
+document.addEventListener('visibilitychange',stopOnHide);
+window.addEventListener('pagehide',stopOnLeave);
 try{
  await flow.runExclusive(async()=>{
+ const requireActive=()=>{
+  if(controller.signal.aborted||document.visibilityState==='hidden'){
+   const e=Error('Safariが非表示になったため、患者データの置き換え前に復元を中断しました');e.name='AbortError';throw e
+  }
+ };
+ requireActive();
  let parts;
- try{parts=await preflight(files,manifest[0])}
+ try{parts=await preflight(files,manifest[0]);requireActive()}
  catch(e){out.textContent='ファイルの事前確認：'+(e.message||String(e))+'。患者データの復元処理は開始していません';return}
  const pin=prompt('バックアップ作成時の暗証を入力してください（チャット等には入力しないでください）');
  if(pin===null){out.textContent='暗証入力を中止しました';return}
+ requireActive();
  out.textContent='全ファイルの整合性を検査中…';
- const result=await MSWImportBridge.run(manifest[0],parts,pin,(done,total)=>{out.textContent='写真認証 '+done+' / '+total+'件'});
+ const result=await MSWImportBridge.run(manifest[0],parts,pin,(done,total)=>{out.textContent='写真認証 '+done+' / '+total+'件'},controller.signal);
  out.textContent=result.cancelled?'復元を中止しました':result.restored?(result.uiWarning||'患者'+result.patients+'件・写真'+result.photos+'件を復元しロックしました'):'復元結果を確認できません。アプリを再読み込みして確認してください';
  });
-}catch(e){out.textContent='復元処理の確認が必要です。エラー：'+(e.message||String(e))+'。既存データに変更がないと断言せず、再読み込み後の状態を確認してください'}
-finally{busy=false;flow.finishImport()}};
+ }catch(e){
+ if(e?.name==='AbortError')
+  out.textContent='復元を中断しました：'+(e.message||'アプリが非表示になりました')+'。現在の患者データの置き換え処理は開始していません';
+ else out.textContent='復元処理の確認が必要です。エラー：'+(e.message||String(e))+'。既存データに変更がないと断言せず、再読み込み後の状態を確認してください'
+}finally{
+ document.removeEventListener('visibilitychange',stopOnHide);
+ window.removeEventListener('pagehide',stopOnLeave);
+ busy=false;flow.finishImport()
+}};
 window.MSWSplitUIFlow?.refresh();
 }
 renderSettings=async function(...args){await original(...args);bind()};
