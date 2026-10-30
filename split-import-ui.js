@@ -34,6 +34,7 @@ const flow=window.MSWSplitUIFlow;
 if(!flow?.tryBeginImport()){out.textContent='分割書き出し中は復元できません。全パートと管理ファイルの保存操作を完了するか、作業を中断する場合はSafariで再読み込みしてください。';return}
 busy=true;
 try{
+ await flow.runExclusive(async()=>{
  let parts;
  try{parts=await preflight(files,manifest[0])}
  catch(e){out.textContent='ファイルの事前確認：'+(e.message||String(e))+'。患者データの復元処理は開始していません';return}
@@ -42,6 +43,7 @@ try{
  out.textContent='全ファイルの整合性を検査中…';
  const result=await MSWImportBridge.run(manifest[0],parts,pin,(done,total)=>{out.textContent='写真認証 '+done+' / '+total+'件'});
  out.textContent=result.cancelled?'復元を中止しました':result.restored?(result.uiWarning||'患者'+result.patients+'件・写真'+result.photos+'件を復元しロックしました'):'復元結果を確認できません。アプリを再読み込みして確認してください';
+ });
 }catch(e){out.textContent='復元処理の確認が必要です。エラー：'+(e.message||String(e))+'。既存データに変更がないと断言せず、再読み込み後の状態を確認してください'}
 finally{busy=false;flow.finishImport()}};
 window.MSWSplitUIFlow?.refresh();
