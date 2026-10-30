@@ -32,3 +32,11 @@
 - 写真を削除・初期化・暗証を再設定しない。
 - 本番公開 `main` に未検証ファイルを追加しない。
 - 架空データで合格しても、そのまま本番導入合格とは見なさない。
+
+
+## 2026-10-30 復元ファイル選択の共通検証部品（未公開）
+- `split-file-selection.js` を新設し、`split-import-ui.js` のファイル選択判定を `MSWSplitFileSelection.add(files,selected)` に統一した。GitHubコミット: `3052e71e32534c6e0885041d80fdeddf954c21e1` / `2bb53538c4ed9e278ed7b7eb50d682abb98e77fd`。
+- 同名ファイル、別run ID混在、ファイル形式不正、パート・管理ファイルのサイズ上限、不正なパート番号、空ファイルを拒否。拒否時は選択済みのMapを全消去（不完全セットで誤復元を進めない）。
+- 実際の独立試験は `piimanbokumetsu-code/msw-v1010-test/split-selection-regression-20261030/` に共通部品そのものをコピー。Git blob SHAが同一であることを確認済み。iPad実行結果は未確認。
+- **重要な読み込み依存:** 導入候補 `index.html` に配線する前に、`split-file-selection.js` を `split-import-ui.js` より先に読み込ませる。SRI/版パラメータと `sw.js` のキャッシュリストも同時更新する。このブランチの `index.html` と `sw.js` は現時点で未変更。
+- ファイル名チェックは復元成功を保証しない。PIN認証・パートSHA-256・写真照合・安全な一括DBコミットは引き続き別段階で検証する。
