@@ -101,3 +101,13 @@
 - 変更後のSHA-384 SRI `split-import-bridge.js` `sha384-KcC+3RcfTHeqHfC3zW3BPjWbFAnMsaR1AndGYQtmygKL2Hx/gOMzyYIWkn1IJS9v`、`split-import-ui.js` `sha384-lCrtjsWRWu1FhSwYj61dsvPolq1AMtJemJWVe1Cjgwt/j8izuZqAqt1JYgJt3rv/` を検証（SHA-384標準abcベクトルと既存split-formatにより二重確認）。`index.html` と `sw.js` の6件を `split-prep-20261030-integrated-v05`、キャッシュ `20261030-kana01-split-prep-v05` に統一。index commit `7eef3602b2630bb3ba7c635a5a0572d741e61f74`、SW commit `c4e02be71a32d147630fb8e5b3fb2f6967e3a074`。
 - GitHub再取得で全JS6件の構文/HTML SRI/オフライン資産6/6と順序すべて一致。既存`app.js` SHA `d47702a132ca2c8f1d609166cda4d72b2d3872fc` 不変、旧単体 `.mswdb` 生成/復元関数残存、本番main index SHA `24aacb61e0f10c30db8099069b760a97af0d8fb8`・SW SHA `d9cb1596772118e3e6fb138724e574822344b1f9` も不変。
 - 未公開のまま。本番アプリ全体の**独立URLと独立IndexedDBでの実機統合確認**は依然未実施。従前フルapp.jsを検証リポジトリへ複写しようとした際のGitHub安全チェックを迂回しない。実患者データ/PIN/本番既存バックアップは扱わない。推定導入準備98%据え置き。追加のiPad操作不要。
+
+
+## 2026-10-30 未公開統合v06：Safari複数タブの分割書出・復元相互排他
+- 発見した問題：`beginMaintenance/endMaintenance` は各SafariタブのJavaScriptメモリ内で管理するため、同じ配信元の複数タブ間の分割バックアップ操作を直接排他できない。別タブで古い`splitstage:`を削除すると、並行する別の復元の検証済み写真まで削除する危険があった。
+- 未公開の`split-export-ui.js`に`MSWSplitUIFlow.runExclusive`を追加。`navigator.locks.request('msw-clinical-split-backup-v1',{mode:'exclusive',ifAvailable:true},async lock=>...)`で同じoriginの**分割処理同士**の実行を排他。ロックが使用中の場合は待ち列に入らず中止。Web Locks APIが使えない端末でも安全側で実行を止める。分割書出しの全期間（ユーザーのパート保存操作待ちも含む）にロックを保持し、Safari非表示による中断後は解放。
+- 未公開`split-import-ui.js`ではpreflight→PINダイアログ→復元処理の全期間を同名Web Lockで保護。暗証番号自体は保存せず、テスト用固定PINも本番候補へ追加しない。GitHubコミット: 書出UI`097e80b430c1f8ac165160065c60c2838556b860`、復元UI`bb460e6f95e05f35bf56357b4517918952be4000`。
+- 同一originの2タブを模した実コード実行テスト**6/6合格**：Aがパート保存待ち中にロック占有、Bの復元はPINも求めず拒否、Bの書出も拒否、Aが非表示中断すればロック解除、解除後Bが復元可能、Web Locks APIが無い場合は実行停止。
+- 変更2JSのSHA-384を、最初の80素数の立方根から定数を計算する独立SHA-384実装で`abc`標準テストベクトルと既存の`split-format.js`の署名を照合して確認。`split-export-ui.js` SRI `sha384-bfPoV+ESbCOMkoW/gB6S/rre92lLfWietlzMen7FIJCPWVTOyeXFpJHP4KFw6sFl`、`split-import-ui.js` SRI `sha384-nSXE9joW1ZYeCognVt924r+2IvL0ZjxjVzvGxM0utUqaJWN1A7tfoyTJeDTYghYA`。index/SW参照6件を`split-prep-20261030-integrated-v06`、SWキャッシュ`20261030-kana01-split-prep-v06`へ更新。index commit`3afd9b8ba089d4efaf031434a567d24e38ee0e4b`、SW commit`7dcac170c93f2ad3cb6abf2a7786e6c0e106cab9`。
+- GitHub再取得: 6 JS構文・SRI・SW 6/6、読み込み順、旧単体.mswdbバックアップ関数の残存、元app.js不変、本番main index/SW SHA不変を確認。
+- **残る重大な注意:** 今回排他しているのは分割操作同士のみ。**別タブでの通常の患者編集や旧単体バックアップ、別オリジンの書き込みを横断的にロックしているわけではない**。本番反映前に、単一タブ運用を徹底する方針とフルアプリ起動・既存単体機能共存の隔離実機検証が必要。現行main、患者保存領域、実PIN、既存暗号バックアップは変更していない。導入準備98％（推定）据え置き。本番公開はユーザー承認前に禁止。
