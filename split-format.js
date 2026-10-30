@@ -83,5 +83,34 @@ const MSWSplitV04=(()=>{
   if(linked.length!==photoIds.size||linked.some(id=>!photoIds.has(id)))err('患者と写真の関連付けが不一致');
   return {verified:true,parts:m.partCount,photos:photoIds.size};
  }
- return Object.freeze({create,verify,format:F,maxPartBytes:MAX});
+ // Re-verify each photo part immediately before the importer decrypts/stages it.
+ // The initial full-file verification and a later file.text() are separate reads;
+ // never trust an unchecked second read. Keep only one <=48MiB part in memory.
+ async function readVerifiedPhotoPart({file,descriptor,run,checkAbort=()=>{}}){
+  if(typeof checkAbort!=='function')err('中断確認処理が不正');
+  checkAbort();
+  if(!file||!descriptor||!/^[0-9a-f]{24}$/.test(run)||
+    descriptor.kind!=='photos'||!Number.isSafeInteger(descriptor.sequence)||
+    descriptor.sequence<2||descriptor.sequence>2001||
+    descriptor.name!==partName(run,descriptor.sequence)||
+    file.name!==descriptor.name||
+    !Number.isSafeInteger(descriptor.bytes)||descriptor.bytes<1||descriptor.bytes>MAX||
+    !Number.isSafeInteger(descriptor.photos)||descriptor.photos<1||descriptor.photos>2000||
+    !/^[0-9a-f]{64}$/.test(descriptor.sha256)||file.size!==descriptor.bytes)
+    err('写真パートの再読込条件が不正');
+  const bytes=await file.arrayBuffer();checkAbort();
+  if(bytes.byteLength!==descriptor.bytes||await hash(bytes)!==descriptor.sha256)
+    err('写真パートの再読込時に整合性が一致しません。復元を中止しました');
+  checkAbort();
+  let part;try{part=JSON.parse(D.decode(bytes))}catch{err('写真パートの再読込データが不正')}
+  if(part.format!==P||part.version!==1||part.run!==run||
+     part.kind!=='photos'||part.sequence!==descriptor.sequence||
+     !part.photos||typeof part.photos!=='object'||Array.isArray(part.photos))
+    err('写真パートの再読込内容が不正');
+  const ids=Object.keys(part.photos);
+  if(ids.length!==descriptor.photos||!ids.length)err('写真パートの再読込件数が不一致');
+  for(const id of ids)if(!ID.test(id)||!cipher(part.photos[id]))err('写真パートの再読込IDまたは暗号記録が不正');
+  return part.photos;
+ }
+ return Object.freeze({create,verify,readVerifiedPhotoPart,format:F,maxPartBytes:MAX});
 })();
