@@ -28,9 +28,16 @@ const m=JSON.parse(await manifest.text());if(m.format!=='MSWDB-SPLIT-V04'||!/^[0
 stage=prefix(m.run);await clean('splitstage:');
 let core=null,passKey=null,index=null,photoIds=[];
 const report=await MSWSplitV04.verify({manifestFile:manifest,partFiles:parts,getReferenceIds:async v=>{
-core=v;passKey=await derive(pin,unb64(v.meta.salt));
-const check=await decryptObj(v.meta.check,passKey);if(check!==true&&check?.ok!==true)throw Error('バックアップ暗証の確認に失敗');
-index=await decryptObj(v.data,passKey);photoIds=refs(index);return photoIds}});
+core=v;
+try{passKey=await derive(pin,unb64(v.meta.salt))}
+catch(e){throw Error('バックアップの暗証鍵を準備できません。暗号情報の破損や端末の暗号処理をご確認ください')}
+let check;
+try{check=await decryptObj(v.meta.check,passKey)}
+catch(e){throw Error('バックアップの暗証番号が違うか、認証情報が破損しています')}
+if(check!==true&&check?.ok!==true)throw Error('バックアップの認証情報が不正です');
+try{index=await decryptObj(v.data,passKey)}
+catch(e){throw Error('暗証認証後、患者情報を復号できません。バックアップが破損している可能性があります')}
+photoIds=refs(index);return photoIds}});
 // Keep the production restore privacy policy: omit prohibited structured fields.
 const privacyReduction=removeProhibitedContactFieldsFromState(index);
 const safeCore={meta:core.meta,data:privacyReduction.removed
