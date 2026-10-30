@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261030-kana01-split-prep-v07';
+const CACHE=CACHE_PREFIX+'20261030-kana01-split-prep-v08';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -19,12 +19,12 @@ const ASSETS=[
   './rx043-compact-editor.js?v=jp01-rx046-20261028',
   './rx045-patient-brand-search.js?v=jp01-rx046-20261028',
   './rx046-strength-sort.js?v=jp01-rx046-20261028',
-  './split-format.js?v=split-prep-20261030-integrated-v07',
-  './split-export-bridge.js?v=split-prep-20261030-integrated-v07',
-  './split-import-bridge.js?v=split-prep-20261030-integrated-v07',
-  './split-file-selection.js?v=split-prep-20261030-integrated-v07',
-  './split-export-ui.js?v=split-prep-20261030-integrated-v07',
-  './split-import-ui.js?v=split-prep-20261030-integrated-v07',
+  './split-format.js?v=split-prep-20261030-integrated-v08',
+  './split-export-bridge.js?v=split-prep-20261030-integrated-v08',
+  './split-import-bridge.js?v=split-prep-20261030-integrated-v08',
+  './split-file-selection.js?v=split-prep-20261030-integrated-v08',
+  './split-export-ui.js?v=split-prep-20261030-integrated-v08',
+  './split-import-ui.js?v=split-prep-20261030-integrated-v08',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
