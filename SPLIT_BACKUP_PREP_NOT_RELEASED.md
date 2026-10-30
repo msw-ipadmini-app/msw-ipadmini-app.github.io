@@ -111,3 +111,12 @@
 - 変更2JSのSHA-384を、最初の80素数の立方根から定数を計算する独立SHA-384実装で`abc`標準テストベクトルと既存の`split-format.js`の署名を照合して確認。`split-export-ui.js` SRI `sha384-bfPoV+ESbCOMkoW/gB6S/rre92lLfWietlzMen7FIJCPWVTOyeXFpJHP4KFw6sFl`、`split-import-ui.js` SRI `sha384-nSXE9joW1ZYeCognVt924r+2IvL0ZjxjVzvGxM0utUqaJWN1A7tfoyTJeDTYghYA`。index/SW参照6件を`split-prep-20261030-integrated-v06`、SWキャッシュ`20261030-kana01-split-prep-v06`へ更新。index commit`3afd9b8ba089d4efaf031434a567d24e38ee0e4b`、SW commit`7dcac170c93f2ad3cb6abf2a7786e6c0e106cab9`。
 - GitHub再取得: 6 JS構文・SRI・SW 6/6、読み込み順、旧単体.mswdbバックアップ関数の残存、元app.js不変、本番main index/SW SHA不変を確認。
 - **残る重大な注意:** 今回排他しているのは分割操作同士のみ。**別タブでの通常の患者編集や旧単体バックアップ、別オリジンの書き込みを横断的にロックしているわけではない**。本番反映前に、単一タブ運用を徹底する方針とフルアプリ起動・既存単体機能共存の隔離実機検証が必要。現行main、患者保存領域、実PIN、既存暗号バックアップは変更していない。導入準備98％（推定）据え置き。本番公開はユーザー承認前に禁止。
+
+
+## 2026-10-30 未公開統合v07：大容量復元の保存容量事前点検
+- Apple/WebKitの保存領域API `navigator.storage.estimate()` の仕様を確認。iPadOS/Safariで使えるが、`quota/usage` は**推定値であり実保存成功を保証しない**。IndexedDBの `QuotaExceededError` への対応は引き続き必須。Web LocksはiOS Safari 15.4以降に対応（ただしデバイス制限等で無効なら安全側で中断）。
+- 未公開 `split-import-bridge.js` に `checkStageCapacity(manifest)` を追加。過去の `splitstage:` 一時データを整理し全パートのSHA-256とAES-GCM患者索引を確認した後、写真をIndexedDBに一時保存する**前**に概算空き容量を確認。読み込む写真パート合計よりも空き推定が小さいときだけ日本語で拒否。元患者 `meta/data/photo:` はこの時点で書き換えない。取得不能・API非対応・不正な見積値なら、復元そのものを不当に止めず既存トランザクションと例外処理に委ねる。
+- 実コードの `checkStageCapacity` を使った模擬試験 **6/6**（不足・十分・未取得・見積エラー・不正値・写真なし）と、実 `MSWImportBridge.run` を使った「不足時、写真ステージを書き始めず現患者レコード維持」 **1/1**、合計 **7/7**。これはiPadのストレージ容量限界を実測したものではない。
+- コード commit `36ffdd233b39e1af133d2ac84307aa25b7aca15f`。SHA-384 SRI `split-import-bridge.js` = `sha384-N3j7Fuq7p8lpRl8FO1K/yIs2UWh00WY+6rY7N/9faPLwqPTWCGE++EfY6PSvK208`（標準 `abc` と既存 `split-format.js` で検証）。`index.html` と `sw.js` の6件を `split-prep-20261030-integrated-v07` に統一、SWキャッシュ `20261030-kana01-split-prep-v07`。コミットindex `306092c24a0c7313e56616449bd14ec5b05e7882`、SW `836e17a75657aa79276d8232bbf36b913424a257`。
+- GitHub再取得で全6 JSの構文・SRI・SW資産と読み込み順が一致。既存 `app.js` の単体 `.mswdb` 生成/復元を維持、SHA `d47702a132ca2c8f1d609166cda4d72b2d3872fc` 不変、公開 `main` のindex/SWも従前のSHAから不変。
+- **本番導入は依然未完了**：本番アプリ全体の隔離URL・別DBでのiPad実機起動、既存機能との共存、大容量完全AES-GCM写真復元は追加検証が必要。従前のGitHub接続の安全フィルターがブロックした full-app.js の別リポジトリ複製は迂回しない。公開main、患者データ、PIN、既存バックアップは変更禁止。導入準備の推定98%据え置き。
