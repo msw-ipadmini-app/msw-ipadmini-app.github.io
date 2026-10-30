@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261029-kana01';
+const CACHE=CACHE_PREFIX+'20261030-kana01-split-prep-v01';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -19,6 +19,12 @@ const ASSETS=[
   './rx043-compact-editor.js?v=jp01-rx046-20261028',
   './rx045-patient-brand-search.js?v=jp01-rx046-20261028',
   './rx046-strength-sort.js?v=jp01-rx046-20261028',
+  './split-format.js?v=split-prep-20261030-integrated-v01',
+  './split-export-bridge.js?v=split-prep-20261030-integrated-v01',
+  './split-import-bridge.js?v=split-prep-20261030-integrated-v01',
+  './split-file-selection.js?v=split-prep-20261030-integrated-v01',
+  './split-export-ui.js?v=split-prep-20261030-integrated-v01',
+  './split-import-ui.js?v=split-prep-20261030-integrated-v01',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
