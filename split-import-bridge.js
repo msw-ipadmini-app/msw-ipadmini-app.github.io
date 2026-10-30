@@ -23,7 +23,9 @@ const action='分割バックアップ安全復元';await beginMaintenance(actio
 try{
 if(!manifest||!Array.isArray(parts)||parts.length>2001||!pin)throw Error('ファイルまたは暗証が不正');
 const m=JSON.parse(await manifest.text());if(m.format!=='MSWDB-SPLIT-V04'||!/^[0-9a-f]{24}$/.test(m.run))throw Error('管理ファイルの形式が不正');
-stage=prefix(m.run);await clean(stage);
+// After a Safari crash, earlier runs can leave large encrypted staging records.
+// Delete ONLY splitstage: temporary keys before a new attempt; never touch photo:/meta/data.
+stage=prefix(m.run);await clean('splitstage:');
 let core=null,passKey=null,index=null,photoIds=[];
 const report=await MSWSplitV04.verify({manifestFile:manifest,partFiles:parts,getReferenceIds:async v=>{
 core=v;passKey=await derive(pin,unb64(v.meta.salt));
