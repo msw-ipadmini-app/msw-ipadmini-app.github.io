@@ -43,9 +43,11 @@ const MSWSplitV04=(()=>{
   const mraw=JSON.stringify(m);if(E.encode(mraw).length>1024*1024)err('管理ファイルが上限超過');
   return {name:manifestName(run),blob:new Blob([mraw],{type:'application/json'}),partCount:parts.length};
  }
- async function verify({manifestFile,partFiles,getReferenceIds}){
+ async function verify({manifestFile,partFiles,getReferenceIds,checkAbort=()=>{}}){
+  if(typeof checkAbort!=='function')err('中断確認処理が不正');checkAbort();
   if(!manifestFile||manifestFile.size<10||manifestFile.size>1024*1024||typeof getReferenceIds!=='function')err('管理ファイル・検証設定が不正');
   let m;try{m=JSON.parse(await manifestFile.text())}catch{err('管理ファイルを読めません')}
+  checkAbort();
   if(m.format!==F||m.version!==1||m.sourceFormat!=='MSWDB-BACKUP'||m.sourceVersion!==2||
    !/^[0-9a-f]{24}$/.test(m.run)||m.partCount<1||m.partCount>2001||
    m.partCount!==m.parts?.length||m.photoCount<0||m.photoCount>2000||
@@ -55,13 +57,15 @@ const MSWSplitV04=(()=>{
   for(const f of files){if(!f||map.has(f.name))err('分割ファイルが重複');map.set(f.name,f)}
   let core=null;const photoIds=new Set();
   for(let i=0;i<m.parts.length;i++){
+   checkAbort();
    const p=m.parts[i],kind=i?'photos':'core',file=map.get(p.name);
    if(p.name!==partName(m.run,i+1)||p.sequence!==i+1||p.kind!==kind||
       !Number.isSafeInteger(p.bytes)||p.bytes<1||p.bytes>MAX||
       !Number.isSafeInteger(p.photos)||p.photos<0||p.photos>2000||
       !/^[0-9a-f]{64}$/.test(p.sha256)||!file||file.size!==p.bytes)err('分割ファイルの構成・サイズが不正');
-   const b=await file.arrayBuffer();
+   const b=await file.arrayBuffer();checkAbort();
    if(b.byteLength!==p.bytes||await hash(b)!==p.sha256)err('ハッシュ検証に失敗');
+   checkAbort();
    let obj;try{obj=JSON.parse(D.decode(b))}catch{err('分割ファイルJSONが不正')}
    if(obj.format!==P||obj.version!==1||obj.run!==m.run||obj.sequence!==i+1||obj.kind!==kind)err('異なるバックアップが混在');
    if(!i){if(p.photos!==0)err('コアに写真数あり');coreOk(obj.meta,obj.data);core={meta:obj.meta,data:obj.data}}
@@ -74,7 +78,8 @@ const MSWSplitV04=(()=>{
   if(photoIds.size!==m.photoCount)err('写真総数が一致しません');
   // Caller must decrypt authenticated patient index with backup PIN and
   // return referenced IDs. This prototype does not touch IndexedDB.
-  const linked=await getReferenceIds(core);idsOk(linked);
+  checkAbort();
+  const linked=await getReferenceIds(core);checkAbort();idsOk(linked);
   if(linked.length!==photoIds.size||linked.some(id=>!photoIds.has(id)))err('患者と写真の関連付けが不一致');
   return {verified:true,parts:m.partCount,photos:photoIds.size};
  }
