@@ -3,6 +3,22 @@ const MSWImportBridge=(()=>{
 const prefix=run=>'splitstage:'+run+':';
 function refs(index){if(!Array.isArray(index?.patients))throw Error('患者索引が不正');const ids=new Set();for(const p of index.patients){if(!Array.isArray(p.attachments||[]))throw Error('写真一覧が不正');let g=0;const ord=new Set();for(const a of p.attachments||[]){if(!a||typeof a.id!=='string'||!/^[A-Za-z0-9_-]{1,100}$/.test(a.id)||ids.has(a.id)||!['genogram','admission'].includes(a.type)||!Number.isSafeInteger(a.order)||a.order<0||a.order>100000)throw Error('写真ID・添付情報が不正');if(a.type==='genogram'&&++g>1)throw Error('ジェノグラム重複');if(a.type==='admission'){if(ord.has(a.order))throw Error('入院時写真の順序重複');ord.add(a.order)}ids.add(a.id)}}return [...ids]}
 async function clean(p){const keys=(await idbKeys()).filter(k=>typeof k==='string'&&k.startsWith(p));for(let i=0;i<keys.length;i+=50)await idbApplyChanges([],keys.slice(i,i+50))}
+// An estimate is advisory, not a promise of successful IndexedDB commits.
+// Only refuse when the reported free quota is already smaller than the incoming
+// encrypted photo parts. Unknown/invalid estimates must not block recovery.
+async function checkStageCapacity(manifest){
+ if(typeof navigator==='undefined'||!navigator.storage?.estimate)return;
+ let estimate;
+ try{estimate=await navigator.storage.estimate()}catch(e){return}
+ const quota=estimate?.quota,usage=estimate?.usage;
+ if(!Number.isFinite(quota)||!Number.isFinite(usage)||quota<=0||usage<0||usage>quota)return;
+ const parts=manifest.parts;
+ if(!Array.isArray(parts))return;
+ const photoBytes=parts.slice(1).reduce((sum,p)=>sum+p.bytes,0);
+ if(!Number.isSafeInteger(photoBytes)||photoBytes<=0)return;
+ if(quota-usage<photoBytes)
+  throw Error('端末の保存可能容量が不足している可能性があります。写真データの一時保存だけで約'+Math.ceil(photoBytes/1048576)+'MiB必要です。患者データは置き換えていません。Safariの保存領域を確認してください');
+}
 async function commit(p,expected,core){
 const old=(await idbKeys()).filter(x=>typeof x==='string'&&x.startsWith('photo:'));
 await new Promise((resolve,reject)=>{
@@ -42,6 +58,7 @@ photoIds=refs(index);return photoIds}});
 const privacyReduction=removeProhibitedContactFieldsFromState(index);
 const safeCore={meta:core.meta,data:privacyReduction.removed
   ?await encryptPatientIndex(index,passKey):core.data};
+await checkStageCapacity(m);
 const wanted=new Set(photoIds);let checked=0;
 for(const file of parts){const part=JSON.parse(await file.text());if(part.kind!=='photos')continue;
 for(const [id,cipher] of Object.entries(part.photos||{})){if(!wanted.has(id)||!cipher?.ct||!cipher?.iv)throw Error('写真レコードが不正');validateStoredPhoto(await decryptObj(cipher,passKey));await idbSet(stage+id,cipher);progress(++checked,report.photos)}}
