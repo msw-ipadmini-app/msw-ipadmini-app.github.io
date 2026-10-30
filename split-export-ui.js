@@ -1,5 +1,5 @@
 'use strict';
-/* Split export UI v02 — isolated fictional-patient validation ONLY.
+/* Split export UI v03 — unreleased integration candidate.
    Preserve in-memory pending blob and status across settings-screen re-render.
    If Safari reloads, do not pretend an incomplete set was completed. */
 (()=>{
@@ -9,6 +9,17 @@ const SESSION_KEY='msw-clinical-split-export-v01-status';
 const baseRender=renderSettings;
 let processing=false,stage='idle',message='未実施',item=null,number=0;
 let priorInterrupted=false;
+// Settings-only coordination. The clinical maintenance lock remains the final gate.
+// Keep a pending export active until the manifest download has been initiated.
+let importBusy=false;
+const flow=Object.freeze({
+ isExportActive:()=>processing||!!item,
+ isImportActive:()=>importBusy,
+ tryBeginImport:()=>{if(importBusy||processing||item)return false;importBusy=true;update();return true},
+ finishImport:()=>{importBusy=false;update()},
+ refresh:()=>update()
+});
+Object.defineProperty(window,'MSWSplitUIFlow',{value:flow,configurable:false});
 try{
  const previous=sessionStorage.getItem(SESSION_KEY);
  if(previous&&previous!=='complete'){
@@ -35,7 +46,15 @@ function update(){
  const panel=$p('splitExportRow');
  if(!panel)return;
  const begin=panel.querySelector('#splitStart'),next=panel.querySelector('#splitNext'),info=panel.querySelector('#splitState');
- begin.disabled=processing;
+ const active=processing||!!item||importBusy;
+ begin.disabled=active;
+ const restore=$p('splitRestore'),pick=$p('splitPick'),clear=$p('splitClear');
+ if(restore)restore.disabled=active;
+ if(pick)pick.disabled=active;
+ if(clear)clear.disabled=active;
+ const legacyBackup=$p('backup'),legacyRestore=$p('restore');
+ if(legacyBackup)legacyBackup.disabled=active;
+ if(legacyRestore)legacyRestore.disabled=active;
  info.textContent=message;
  if(item){
   next.hidden=false;
@@ -75,8 +94,7 @@ async function saveNext(){
  }
 }
 async function run(){
- if(processing)return;
- if(item)return;
+ if(processing||item||importBusy)return;
  processing=true;number=0;priorInterrupted=false;
  setStatus('running','患者の暗号化記録を確認しています…');
  try{
