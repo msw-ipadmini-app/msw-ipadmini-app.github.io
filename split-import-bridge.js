@@ -71,10 +71,15 @@ const safeCore={meta:core.meta,data:privacyReduction.removed
   ?await encryptPatientIndex(index,passKey):core.data};
 await checkStageCapacity(m);active();
 const wanted=new Set(photoIds);let checked=0;
-for(const file of parts){
- active();const part=JSON.parse(await file.text());active();
- if(part.kind!=='photos')continue;
- for(const [id,cipher] of Object.entries(part.photos||{})){
+// Verify second-read content against the original manifest SHA-256 as well.
+// Iterate manifest order so even an out-of-order file selection stays safe.
+const filesByName=new Map(parts.map(file=>[file.name,file]));
+for(const descriptor of m.parts.slice(1)){
+ active();
+ const photos=await MSWSplitV04.readVerifiedPhotoPart({
+  file:filesByName.get(descriptor.name),descriptor,run:m.run,checkAbort:active
+ });
+ for(const [id,cipher] of Object.entries(photos)){
   active();
   if(!wanted.has(id)||!cipher?.ct||!cipher?.iv)throw Error('写真レコードが不正');
   const photo=await decryptObj(cipher,passKey);active();
