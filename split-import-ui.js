@@ -8,7 +8,7 @@ panel.innerHTML='<h3>分割バックアップ復元（導入候補）</h3><p cla
 after.insertAdjacentElement('afterend',panel);
 const pick=panel.querySelector('#splitPick'),out=panel.querySelector('#splitImportStatus'),count=panel.querySelector('#splitCount');
 const files=new Map();let busy=false;
-pick.onchange=()=>{const selected=Array.from(pick.files||[]);pick.value='';for(const f of selected){if(!/^msw-split-[0-9a-f]{24}-(manifest|[0-9]{4})\.json$/.test(f.name)||f.size>48*1024*1024){out.textContent='同じバックアップの分割JSONだけ選択してください';continue}files.set(f.name,f)}count.textContent='選択済み '+files.size+' ファイル'};
+pick.onchange=()=>{const selected=Array.from(pick.files||[]);pick.value='';for(const f of selected){if(!/^msw-split-[0-9a-f]{24}-(manifest|[0-9]{4})\.json$/.test(f.name)||f.size>48*1024*1024){out.textContent='同じバックアップの分割JSONだけ選択してください';continue}if(files.has(f.name)){out.textContent='同名ファイルが重複しました。選択をやり直してください';files.clear();count.textContent='選択済み 0 ファイル';return}files.set(f.name,f)}count.textContent='選択済み '+files.size+' ファイル'};
 panel.querySelector('#splitClear').onclick=()=>{if(busy)return;files.clear();count.textContent='選択済み 0 ファイル';out.textContent='未実施'};
 panel.querySelector('#splitRestore').onclick=async()=>{if(busy)return;const manifest=[...files.values()].filter(f=>f.name.endsWith('-manifest.json'));if(manifest.length!==1){out.textContent='管理ファイルは1個だけ選んでください';return}
 const pin=prompt('バックアップ作成時の暗証を入力してください（チャット等には入力しないでください）');if(pin===null)return;
