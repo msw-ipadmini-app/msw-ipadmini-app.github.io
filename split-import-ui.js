@@ -34,7 +34,7 @@ const flow=window.MSWSplitUIFlow;
 if(!flow?.tryBeginImport()){out.textContent='分割書き出し中は復元できません。全パートと管理ファイルの保存操作を完了するか、作業を中断する場合はSafariで再読み込みしてください。';return}
 busy=true;
 try{
- const parts=await preflight(files,manifest);
+ const parts=await preflight(files,manifest[0]);
  const pin=prompt('バックアップ作成時の暗証を入力してください（チャット等には入力しないでください）');
  if(pin===null){out.textContent='暗証入力を中止しました';return}
  out.textContent='全ファイルの整合性を検査中…';
