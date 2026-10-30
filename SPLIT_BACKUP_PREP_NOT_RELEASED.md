@@ -92,3 +92,12 @@
 - 新JSのSHA-384 SRIは独立ハッシュ計算を標準 `abc` ベクトルおよび変更していない `split-format.js` の既存SRIと比較して検証。`split-export-ui.js` 新SRI `sha384-e/URJOYeYYni1wEuOm28e0dNflpTgFONcTSDx3ziQsiYIgxWDxeiq4h4AiMJ5d64`。index.htmlの6 JSとSWの6キャッシュ対象を `split-prep-20261030-integrated-v04` に統一、キャッシュ版 `20261030-kana01-split-prep-v04`。index commit `ce82c86ed4a4d21ca7ab7372f7a41d5f9fb05961`、SW commit `031cb1590141ea16ac9403f26b34ba7ece1a1797`。
 - すべての6部品の参照/SRI/読み込み順/構文/キャッシュ対応が合格。既存の単体 `.mswdb` 書出/復元関数・UIは残存、`app.js` SHA `d47702a132ca2c8f1d609166cda4d72b2d3872fc` を維持。本番 `main` のindex SHA `24aacb61e0f10c30db8099069b760a97af0d8fb8`、SW SHA `d9cb1596772118e3e6fb138724e574822344b1f9` とも不変。
 - **リリース禁止は継続。** 独立URL/独立DBのフル統合実機検証をまだ実施できず、原app.jsを外部テストリポジトリへ複写する操作は以前GitHubの安全チェックでブロックされた。迂回しない。本番main・実患者データ・PIN・既存105.2MBバックアップに触れない。前回までの合格試験を繰り返さない。
+
+
+## 2026-10-30 未公開統合v05：復元前ファイル不足と暗証エラーの明確化
+- 本番組込み候補 `split-import-ui.js` に小さい管理ファイル `manifest` だけを先に読む **preflight** を追加。全パートの個数・ファイル名・サイズが一致するか確認し、不足/不整合ならPIN入力ダイアログを表示せず処理を止める。SHA-256およびAES-GCMの本検証、置換前の再確認は既存 `MSWSplitV04.verify` / `MSWImportBridge.run` のまま実施。事前確認のエラーだけは「患者データの復元処理は開始していません」と区別し、実コミット後に失敗した場合の慎重な案内を維持。
+- 復元ブリッジの暗証鍵準備・AES-GCM暗証照合・患者索引復号の失敗を日本語メッセージで段階別表示。誤PINと破損のどちらか断定しない。暗証そのものはログ/URL/画面エラーへ含めない。コードコミット: `split-import-bridge.js` `539ed7c9565998156a9d692290937667e9ec6038`、`split-import-ui.js` `905fdfea41c5d9193c6579b91bab4603b0bce900` → `f53c0d54b26af5422ac5819dc5d700ad6686e170` → `b25f3a03086a2a202faf1589cbc1fdfc5d62e9bf`。
+- 模擬検査: preflight単体6/6、認証例外2/2、実split UIと暗証ダイアログ/復元コールを繋いだ連動テスト3/3合格（正常なセットはPIN確認へ進む、パート不足/サイズ不一致はPINを開かず中止）。この検査はiPad実機ではなく**コードの模擬実行**。
+- 変更後のSHA-384 SRI `split-import-bridge.js` `sha384-KcC+3RcfTHeqHfC3zW3BPjWbFAnMsaR1AndGYQtmygKL2Hx/gOMzyYIWkn1IJS9v`、`split-import-ui.js` `sha384-lCrtjsWRWu1FhSwYj61dsvPolq1AMtJemJWVe1Cjgwt/j8izuZqAqt1JYgJt3rv/` を検証（SHA-384標準abcベクトルと既存split-formatにより二重確認）。`index.html` と `sw.js` の6件を `split-prep-20261030-integrated-v05`、キャッシュ `20261030-kana01-split-prep-v05` に統一。index commit `7eef3602b2630bb3ba7c635a5a0572d741e61f74`、SW commit `c4e02be71a32d147630fb8e5b3fb2f6967e3a074`。
+- GitHub再取得で全JS6件の構文/HTML SRI/オフライン資産6/6と順序すべて一致。既存`app.js` SHA `d47702a132ca2c8f1d609166cda4d72b2d3872fc` 不変、旧単体 `.mswdb` 生成/復元関数残存、本番main index SHA `24aacb61e0f10c30db8099069b760a97af0d8fb8`・SW SHA `d9cb1596772118e3e6fb138724e574822344b1f9` も不変。
+- 未公開のまま。本番アプリ全体の**独立URLと独立IndexedDBでの実機統合確認**は依然未実施。従前フルapp.jsを検証リポジトリへ複写しようとした際のGitHub安全チェックを迂回しない。実患者データ/PIN/本番既存バックアップは扱わない。推定導入準備98%据え置き。追加のiPad操作不要。
