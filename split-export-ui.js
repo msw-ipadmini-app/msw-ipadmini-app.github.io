@@ -1,5 +1,5 @@
 'use strict';
-/* Split export UI v03 — unreleased integration candidate.
+/* Split export UI v04 — unreleased integration candidate.
    Preserve in-memory pending blob and status across settings-screen re-render.
    If Safari reloads, do not pretend an incomplete set was completed. */
 (()=>{
@@ -11,7 +11,7 @@ let processing=false,stage='idle',message='未実施',item=null,number=0;
 let priorInterrupted=false;
 // Settings-only coordination. The clinical maintenance lock remains the final gate.
 // Keep a pending export active until the manifest download has been initiated.
-let importBusy=false;
+let importBusy=false,pendingReject=null,cancelRequested=false;
 const flow=Object.freeze({
  isExportActive:()=>processing||!!item,
  isImportActive:()=>importBusy,
@@ -35,6 +35,18 @@ function setStatus(next,text){
  else sessionStorage.setItem(SESSION_KEY,next)}catch{}
  update();
 }
+// Never leave the clinical maintenance lock waiting on a user download after
+// Safari hides or navigates away. Keep all completed local files untouched.
+function interruptHiddenExport(){
+ if(!processing&&!item)return;
+ cancelRequested=true;
+ const reject=pendingReject;pendingReject=null;item=null;
+ const reason='アプリが非表示になったため分割書き出しを中断しました。部分ファイルだけでは復元できません。ロック解除後、必要に応じて最初から作成してください。';
+ setStatus('interrupted',reason);
+ if(reject)reject(new Error(reason));
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')interruptHiddenExport()});
+window.addEventListener('pagehide',()=>interruptHiddenExport());
 function beginDownload(blob,filename){
  if(!blob||!blob.size||typeof filename!=='string')throw Error('保存するファイルが不正です');
  const a=document.createElement('a'),url=URL.createObjectURL(blob);
@@ -78,10 +90,11 @@ function attach(){
  update();
 }
 async function saveNext(){
- if(!item||item.saving)return;
+ if(!item||item.saving||cancelRequested)return;
  const pending=item;pending.saving=true;update();
  try{
   beginDownload(pending.blob,pending.name);
+  if(cancelRequested)return;
   if(pending.kind==='manifest'){
    item=null;setStatus('complete','全ファイルのダウンロードを開始しました。Safariのダウンロード履歴と「ファイル」で、管理ファイルを含む全件が実在するか必ず確認してください。復元成功はまだ未確認です。');
   }else{
@@ -95,24 +108,29 @@ async function saveNext(){
 }
 async function run(){
  if(processing||item||importBusy)return;
- processing=true;number=0;priorInterrupted=false;
+ processing=true;number=0;priorInterrupted=false;cancelRequested=false;
  setStatus('running','患者の暗号化記録を確認しています…');
  try{
   const result=await MSWExportBridge.run(async(desc,blob)=>{
+   if(cancelRequested)throw Error('書き出し中断');
    number++;
    if(item)throw Error('保存待ちのパートが重複しました');
-   await new Promise((resolve)=>{
+   await new Promise((resolve,reject)=>{
+    pendingReject=reject;
     item={kind:'part',blob,name:desc.name,sequence:number,resolve,saving:false};
     setStatus('pending','パート '+number+'（'+(desc.bytes/1048576).toFixed(2)+'MiB）の保存操作をしてください。保存の実在確認は後で行います。');
    });
+   pendingReject=null;
+   if(cancelRequested)throw Error('書き出し中断');
   });
+  if(cancelRequested)throw Error('書き出し中断');
   item={kind:'manifest',name:result.name,blob:result.blob,saving:false};
   setStatus('pending','写真 '+result.photoCount+'枚、パート '+result.partCount+'個のダウンロード操作が終わりました。最後に管理ファイルを保存してください。');
  }catch(e){
   item=null;
-  setStatus('interrupted','分割書き出しは中断されました：'+(e.message||String(e))+'。部分ファイルは復元には使えません。');
+  setStatus('interrupted',cancelRequested?'アプリの非表示により書き出しを中断しました。部分ファイルは使用できません。':'分割書き出しは中断されました：'+(e.message||String(e))+'。部分ファイルは復元には使えません。');
  }finally{
-  processing=false;
+  processing=false;pendingReject=null;
   update();
  }
 }
