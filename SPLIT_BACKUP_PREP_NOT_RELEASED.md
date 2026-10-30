@@ -40,3 +40,10 @@
 - 実際の独立試験は `piimanbokumetsu-code/msw-v1010-test/split-selection-regression-20261030/` に共通部品そのものをコピー。Git blob SHAが同一であることを確認済み。iPad実行結果は未確認。
 - **重要な読み込み依存:** 導入候補 `index.html` に配線する前に、`split-file-selection.js` を `split-import-ui.js` より先に読み込ませる。SRI/版パラメータと `sw.js` のキャッシュリストも同時更新する。このブランチの `index.html` と `sw.js` は現時点で未変更。
 - ファイル名チェックは復元成功を保証しない。PIN認証・パートSHA-256・写真照合・安全な一括DBコミットは引き続き別段階で検証する。
+
+
+## 2026-10-30 大容量実保存・読戻し合格を反映（本番統合は未実施）
+- iPad mini Safariの独立架空試験 `piimanbokumetsu-code/msw-v1010-test/split-file-roundtrip-stage-20261030/?v=01` で約13MiB 4ファイル、約136MiB 14ファイルをそれぞれ「ファイル」アプリで実在確認。
+- いずれも保存した全パートとmanifestを再選択し、SHA-256照合・架空写真ID照合・FAKE TESTのAES-GCM復号と画像表示をユーザーが合格確認。
+- 約136MiBの13分割パートは**ダミー暗号文形式**を含み、実際に認証付き復号・画像表示したのは架空JPEG 1枚のみ。全130件のAES-GCM写真復号や既存患者DBへの完全復元は未検証。この点を合格基準と混同しない。
+- 引き続き必要：本番候補の同一復元実装を用いた架空DBの全写真復号と一括トランザクション復元、保存容量・中断耐性、既存単体.mswdbとの両立、`index.html`/SRI/`sw.js` 配線とiPad実機確認。承認まで本番mainと実患者データを変更しない。
