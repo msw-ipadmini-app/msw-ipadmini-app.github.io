@@ -49,13 +49,17 @@ function openKanaBatch(){
   const close=document.createElement('button');close.type='button';close.className='btn secondary';close.textContent='← 戻る';
   const title=document.createElement('h2');title.textContent='フリガナをまとめて確認';
   const number=document.createElement('span');number.id='kana02Remaining';number.className='count';
+  const diagButton=document.createElement('button');diagButton.type='button';diagButton.className='btn secondary';
+  diagButton.textContent='候補診断（件数のみ）';
+  const diagReport=document.createElement('p');diagReport.className='notice';
+  diagReport.setAttribute('role','status');diagReport.setAttribute('aria-live','polite');
   const text=document.createElement('p');text.className='notice';
   text.textContent='一般的な読みの候補です。正しい読みを確認して、違うところだけ手直しし、患者ごとに「確認」を押してください。候補は確認するまで保存されません。';
   const message=document.createElement('p');message.setAttribute('role','status');message.setAttribute('aria-live','polite');message.className='notice';
   const body=document.createElement('div');body.className='sheetbody';
   const list=document.createElement('div');list.className='kana02-batch-list';
-  head.append(close,title,number);sheet.append(head);
-  body.append(text,message,list);sheet.append(body);dialog.append(sheet);document.body.append(dialog);
+  head.append(close,title,number,diagButton);sheet.append(head);
+  body.append(text,diagReport,message,list);sheet.append(body);dialog.append(sheet);document.body.append(dialog);
   const styleId='kana02BatchStyle';
   if(!document.getElementById(styleId)){
     const style=document.createElement('style');style.id=styleId;
@@ -66,6 +70,40 @@ function openKanaBatch(){
   function count(){number.textContent='残り '+patients.filter(p=>!kana.isConfirmed(p)).length+'人'}
   function exit(){dialog.remove();if(key&&state&&!selectedPatient&&screen==='patients')renderPatients()}
   close.addEventListener('click',exit);
+  // Aggregate-only, read-only diagnostic: no patient names, medical data or PINs in the output.
+  // Classifies offline dictionary coverage, not whether any name reading is correct.
+  diagButton.addEventListener('click',()=>{
+    if(!stillValid()){diagReport.textContent='画面の状態が変わりました。閉じて開き直してください。';return;}
+    const counts={candidate:0,missingName:0,unknownFamily:0,unknownGiven:0,unsupportedFormat:0};
+    for(const patient of patients){
+      if(kana.isConfirmed(patient))continue;
+      const raw=String(patient.data?.['氏名']||'');
+      if(kana.preview(patient).text){counts.candidate++;continue;}
+      // Probe with a fixed invented given name, entirely on-device.
+      const name=raw.normalize('NFKC')
+       .replace(/[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g,'')
+       .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g,' ')
+       .replace(/[・･\/／|｜,，、]+/g,' ')
+       .replace(/\s+/g,' ').trim();
+      if(!name){counts.missingName++;continue}
+      const parts=name.split(' ');
+      if(parts.length>2){counts.unsupportedFormat++;continue}
+      let knownFamily=false;
+      if(parts.length===2){
+        knownFamily=!!kana.suggest(parts[0]+' 花子');
+      }else{
+        for(let len=1;len<=Math.min(5,name.length-1);len++){
+          if(kana.suggest(name.slice(0,len)+' 花子')){knownFamily=true;break}
+        }
+      }
+      if(knownFamily)counts.unknownGiven++;else counts.unknownFamily++;
+    }
+    const total=Object.values(counts).reduce((sum,v)=>sum+v,0);
+    diagReport.textContent='端末内の候補診断（未確認 '+total+'人、氏名は出力しません）：'
+      +'候補あり '+counts.candidate+'人／姓候補あり・名候補なし '+counts.unknownGiven
+      +'人／姓候補なし '+counts.unknownFamily+'人／区切り要確認 '+counts.unsupportedFormat
+      +'人／氏名空欄 '+counts.missingName+'人。分類は推定です。診断では保存しません。';
+  });
   if(!patients.length){
     const empty=document.createElement('p');empty.className='empty';empty.textContent='在院患者のフリガナはすべて確認済みです。';
     list.append(empty);count();return;
