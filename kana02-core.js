@@ -100,6 +100,10 @@
   '栄子:エイコ 栄一:エイイチ 富子:トミコ'
  ].join(' '));
  const extendedGiven=pairs('義男:ヨシオ 義夫:ヨシオ 義雄:ヨシオ 義一:ヨシカズ 義明:ヨシアキ 義弘:ヨシヒロ 義彦:ヨシヒコ 義之:ヨシユキ 義則:ヨシノリ 義信:ヨシノブ 義和:ヨシカズ 敏明:トシアキ 敏彦:トシヒコ 敏弘:トシヒロ 敏之:トシユキ 俊一:シュンイチ 俊明:トシアキ 俊彦:トシヒコ 俊幸:トシユキ 俊雄:トシオ 正明:マサアキ 正彦:マサヒコ 正弘:マサヒロ 正博:マサヒロ 正幸:マサユキ 正義:マサヨシ 正治:マサハル 正志:マサシ 正巳:マサミ 昭一:ショウイチ 昭彦:アキヒコ 昭男:アキオ 昭代:アキヨ 昭江:アキエ 昭美:アキミ 和男:カズオ 和雄:カズオ 和明:カズアキ 和久:カズヒサ 和則:カズノリ 和枝:カズエ 和江:カズエ 和代:カズヨ 和美:カズミ 康雄:ヤスオ 康一:コウイチ 康弘:ヤスヒロ 康之:ヤスユキ 康明:ヤスアキ 康江:ヤスエ 幸一:コウイチ 幸一郎:コウイチロウ 幸男:ユキオ 幸代:サチヨ 幸美:ユキミ 幸江:ユキエ 清子:キヨコ 清二:セイジ 清志:キヨシ 清隆:キヨタカ 清彦:キヨヒコ 清治:キヨハル 清司:キヨシ 茂夫:シゲオ 茂雄:シゲオ 茂樹:シゲキ 茂子:シゲコ 勝利:カツトシ 勝彦:カツヒコ 勝弘:カツヒロ 勝子:カツコ 勝利:カツトシ 勝昭:カツアキ 光一:コウイチ 光一郎:コウイチロウ 光明:ミツアキ 光彦:ミツヒコ 光弘:ミツヒロ 光江:ミツエ 光代:ミツヨ 実子:ミノリコ 富雄:トミオ 富男:トミオ 富夫:トミオ 富美子:フミコ 富美:トミミ 千枝子:チエコ 千鶴子:チヅコ 千代:チヨ 千秋:チアキ 千尋:チヒロ 典夫:ノリオ 典雄:ノリオ 紀夫:ノリオ 紀子:ノリコ 紀美子:キミコ 道子:ミチコ 道夫:ミチオ 道雄:ミチオ 道代:ミチヨ 道江:ミチエ 京子:キョウコ 京一:キョウイチ 京美:キョウミ 文子:フミコ 文江:フミエ 文代:フミヨ 文美:フミミ 文明:フミアキ 文彦:フミヒコ 文弘:フミヒロ 美津子:ミツコ 美枝子:ミエコ 美代:ミヨ 美智代:ミチヨ 美佐江:ミサエ 美千代:ミチヨ 美和子:ミワコ 恵美:エミ 恵理子:エリコ 恵理:エリ 恵美子:エミコ 恵津子:エツコ 悦子:エツコ 悦夫:エツオ 悦男:エツオ 静江:シズエ 静子:シズコ 静香:シズカ 静雄:シズオ 節男:セツオ 節夫:セツオ 節江:セツエ 久美:クミ 久美子:クミコ 久代:ヒサヨ 久江:ヒサエ 久雄:ヒサオ 久男:ヒサオ 久夫:ヒサオ 由紀江:ユキエ 由紀子:ユキコ 由美:ユミ 由香里:ユカリ 由佳:ユカ 由佳子:ユカコ 真由美:マユミ 真紀子:マキコ 真希:マキ 真弓:マユミ 真澄:マスミ 真理:マリ 真由:マユ 優:ユウ 優一:ユウイチ 優太:ユウタ 優美:ユミ 優香:ユウカ 優希:ユウキ 佳子:ヨシコ 佳代子:カヨコ 佳代:カヨ 佳奈:カナ 佳奈子:カナコ 佳美:ヨシミ 玲子:レイコ 玲奈:レナ 玲美:レミ 千恵:チエ 千香子:チカコ 千佳:チカ 春江:ハルエ 春代:ハルヨ 春雄:ハルオ 春夫:ハルオ 秋江:アキエ 秋代:アキヨ 夏子:ナツコ 夏代:ナツヨ 香代子:カヨコ 香奈:カナ 香澄:カスミ 雅彦:マサヒコ 雅弘:マサヒロ 雅之:マサユキ 雅男:マサオ 雅夫:マサオ 雅雄:マサオ 智恵子:チエコ 智恵:チエ 智代:トモヨ 智佳子:チカコ 隆夫:タカオ 隆雄:タカオ 隆男:タカオ 隆一:リュウイチ 隆彦:タカヒコ 隆之:タカユキ 隆子:タカコ');
+ const extra=root.MSWKana04Data||{};
+ const extraSurnames=extra.surnames||Object.create(null);
+ const extraGiven=extra.given||Object.create(null);
+ const allSurnames=Object.freeze(Object.assign(Object.create(null),extraSurnames,surnames,extendedSurnames));
  const charGiven=pairs([
   '太:タ 郎:ロウ 一:イチ 二:ジ 三:サン 四:シ 雄:オ 夫:オ 男:オ 子:コ 美:ミ',
   '恵:エ 智:トモ 由:ユ 紀:キ 幸:ユキ 光:ミツ 明:アキ 和:カズ',
@@ -115,17 +119,17 @@
  function normalizeKana(s){return toKata(s).replace(/[\s　]+/g,' ').trim();}
  function isKana(s){return /^[ァ-ヿー・\s]+$/.test(toKata(s)) && !!String(s).trim();}
  function readGiven(s){
-  if(given[s]||extendedGiven[s])return given[s]||extendedGiven[s];
+  if(given[s]||extendedGiven[s]||extraGiven[s])return given[s]||extendedGiven[s]||extraGiven[s];
   if(isKana(s))return normalizeKana(s);
   let result='',rest=s;
   // Prefer dictionary chunks over one-kanji guesses.
   while(rest){
    // First prefer the longest complete given-name entry, including newly added names.
-   if(given[rest]||extendedGiven[rest]){result+=(given[rest]||extendedGiven[rest]);break;}
+   if(given[rest]||extendedGiven[rest]||extraGiven[rest]){result+=(given[rest]||extendedGiven[rest]||extraGiven[rest]);break;}
    let part='';
    const max=Math.min(4,rest.length);
-   for(let n=max;n>1;n--){if(given[rest.slice(0,n)]||extendedGiven[rest.slice(0,n)]){part=rest.slice(0,n);break}}
-   if(part){result+=(given[part]||extendedGiven[part]);rest=rest.slice(part.length);continue}
+   for(let n=max;n>1;n--){if(given[rest.slice(0,n)]||extendedGiven[rest.slice(0,n)]||extraGiven[rest.slice(0,n)]){part=rest.slice(0,n);break}}
+   if(part){result+=(given[part]||extendedGiven[part]||extraGiven[part]);rest=rest.slice(part.length);continue}
    if(!charGiven[rest[0]])return '';
    result+=charGiven[rest[0]];rest=rest.slice(1);
   }
@@ -145,13 +149,16 @@
   let family='',givenName='';
   if(parts.length===2){family=parts[0];givenName=parts[1]}
   else if(parts.length===1){
-   // In unspaced names, choose a known surname only when a given name remains.
-   const familyCandidates=Object.keys({...surnames,...extendedSurnames}).filter(function(k){return name.startsWith(k)&&name.length>k.length});
+   // Choose a complete candidate over a longer but incorrect surname split.
+   const familyCandidates=Object.keys(allSurnames).filter(function(k){return name.startsWith(k)&&name.length>k.length});
    familyCandidates.sort(function(a,b){return b.length-a.length});
-   family=familyCandidates[0]||'';
-   givenName=family?name.slice(family.length):'';
+   for(const candidate of familyCandidates){
+    const reading=readGiven(name.slice(candidate.length));
+    if(reading)return allSurnames[candidate]+' '+reading;
+   }
+   return '';
   }else return '';
-  const surnameKana=(surnames[family]||extendedSurnames[family])||(isKana(family)?normalizeKana(family):'');
+  const surnameKana=allSurnames[family]||(isKana(family)?normalizeKana(family):'');
   const givenKana=readGiven(givenName);
   return surnameKana&&givenKana?(surnameKana+' '+givenKana):'';
  }
@@ -166,5 +173,5 @@
   return {text:current||suggest(p&&p.data&&p.data['氏名']),confirmed:false};
  }
  root.MSWKana02=Object.freeze({suggest:suggest,isConfirmed:isConfirmed,preview:preview,normalizeKana:normalizeKana,
-  surnameCount:Object.keys({...surnames,...extendedSurnames}).length,givenCount:Object.keys({...given,...extendedGiven}).length,version:'KANA03-COVERAGE-DEV'});
+  surnameCount:Object.keys(allSurnames).length,givenCount:Object.keys({...extraGiven,...given,...extendedGiven}).length,version:'KANA04-BROAD-DEV'});
 })(window);
