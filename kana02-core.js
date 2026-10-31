@@ -128,7 +128,13 @@
   return result;
  }
  function suggest(fullName){
-  const name=String(fullName||'').normalize('NFKC').replace(/[　\t]+/g,' ').replace(/ +/g,' ').trim();
+  // Normalize imported display-name separators only for the unsaved reading preview.
+  // This never alters registered names or existing confirmed readings.
+  const name=String(fullName||'').normalize('NFKC')
+   .replace(/[\u200B-\u200D\u2060\uFEFF\u202A-\u202E\u2066-\u2069]/g,'')
+   .replace(/[\u0000-\u001F\u007F-\u009F\u2028\u2029]/g,' ')
+   .replace(/[・･\/／|｜,，、]+/g,' ')
+   .replace(/\s+/g,' ').trim();
   if(!name)return '';
   if(isKana(name))return normalizeKana(name);
   const parts=name.split(' ');
