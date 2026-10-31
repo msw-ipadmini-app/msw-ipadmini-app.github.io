@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261031-kana02-dev-unreleased';
+const CACHE=CACHE_PREFIX+'20261031-kana02-buttons-fix1-dev-unreleased';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -21,7 +21,7 @@ const ASSETS=[
   './rx046-strength-sort.js?v=jp01-rx046-20261028',
   './rx047-drug-master-backup.js?v=rx047-litev01-20261031',
   './kana02-core.js?v=kana02-20261031',
-  './kana02-addon.js?v=kana02-20261031',
+  './kana02-addon.js?v=kana02-20261031-buttons-fix1',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
