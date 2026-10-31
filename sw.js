@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261031-kana02-buttons-fix1-dev-unreleased';
+const CACHE=CACHE_PREFIX+'20261031-kana02-rc1-ready-for-approval';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
