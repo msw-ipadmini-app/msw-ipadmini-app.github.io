@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261031-kana02-rc1-ready-for-approval';
+const CACHE=CACHE_PREFIX+'20261031-kana03-rc1-draft';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -21,7 +21,18 @@ const ASSETS=[
   './rx046-strength-sort.js?v=jp01-rx046-20261028',
   './rx047-drug-master-backup.js?v=rx047-litev01-20261031',
   './kana02-core.js?v=kana02-20261031',
-  './kana02-addon.js?v=kana02-20261031-buttons-fix1',
+  './kana03-surnames.js?v=kana03-20261031-rc1',
+  './kana03-given-01.js?v=kana03-20261031-rc1',
+  './kana03-given-02.js?v=kana03-20261031-rc1',
+  './kana03-given-03.js?v=kana03-20261031-rc1',
+  './kana03-given-04.js?v=kana03-20261031-rc1',
+  './kana03-given-05.js?v=kana03-20261031-rc1',
+  './kana03-given-06.js?v=kana03-20261031-rc1',
+  './kana03-given-07.js?v=kana03-20261031-rc1',
+  './kana03-given-08.js?v=kana03-20261031-rc1',
+  './kana03-core.js?v=kana03-20261031-rc1',
+  './kana03-addon.js?v=kana03-20261031-rc1',
+  './KANA03_THIRD_PARTY_NOTICES.txt',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
