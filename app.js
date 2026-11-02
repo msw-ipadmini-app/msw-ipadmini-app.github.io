@@ -2927,6 +2927,8 @@ function renderJournalPreview(){
      if(kana&&(jConfirmedName!==name||jConfirmedKana!==kana)){
        alert('フリガナを確認し、「確認」を押してから一覧に追加してください。');return;
      }
+     if(!kana&&jConfirmedName&&jConfirmedName!==name&&
+        !confirm('氏名を変更したためフリガナが空欄になりました。空欄のまま登録しますか？'))return;
      const matches=state.patients.filter(p=>!p.dischargeDate&&String(p.data['氏名']||'').replace(/\s/g,'')===name.replace(/\s/g,''));
      if(matches.length&&!confirm(`同じ氏名の入院患者が${matches.length}名います。既存患者を確認しましたか？\nそれでも新しく登録しますか？`))return;
      if(bed){const occupied=activePatients().filter(p=>normalizeBed(p.data['ベッド番号'])===normalizeBed(bed));if(occupied.length&&!confirm(`選択したベッドにはすでに${occupied.length}名登録されています。重複配置しますか？`))return;}
