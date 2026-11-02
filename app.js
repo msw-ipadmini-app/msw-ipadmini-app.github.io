@@ -2879,7 +2879,7 @@ function bindPendingDischarges(){
 let journalEntryOpen=false,journalScanImage=null,journalScanText='',journalScanStatus='';
 function renderJournalPreview(){
   const admissions=state.patients.filter(p=>!p.dischargeDate&&p.journalAdmissionPending&&!isMappedBed(p.data?.['ベッド番号'])).sort((a,b)=>String(a.data['入院日']||'').localeCompare(String(b.data['入院日']||'')));
-  const entry=`<div class="journal-entry"><h3>新しい患者を手入力</h3><div class="journal-entry-fields"><label>氏名<input id="journalNewName" type="text" autocomplete="off" placeholder="氏名を入力"></label><label>入院日<input id="journalNewDate" type="date" value="${new Date().toLocaleDateString('sv-SE')}"></label><label>ベッド配置先<button class="btn secondary journal-pick" id="journalNewBedPick" type="button">その他・未配置 ▾</button><input type="hidden" id="journalNewBed" value=""></label></div><div class="journal-entry-actions"><button type="button" class="btn secondary" id="journalCancel">キャンセル</button><button type="button" class="btn" id="journalAdd">一覧に追加</button></div></div>`;
+  const entry=`<div class="journal-entry"><h3>新しい患者を手入力</h3><div class="journal-entry-fields"><label>氏名<input id="journalNewName" type="text" autocomplete="off" placeholder="氏名を入力"></label><label>フリガナ <span id="journalKanaStatus" class="furigana-status">未入力</span><span class="furigana-entry-control"><input id="journalNewKana" type="text" autocomplete="off" placeholder="漢字変換時に候補／手入力"><button id="journalKanaConfirm" type="button" class="furigana-confirm" aria-label="フリガナを確認">確認</button></span></label><label>入院日<input id="journalNewDate" type="date" value="${new Date().toLocaleDateString('sv-SE')}"></label><label>ベッド配置先<button class="btn secondary journal-pick" id="journalNewBedPick" type="button">その他・未配置 ▾</button><input type="hidden" id="journalNewBed" value=""></label></div><div class="journal-entry-actions"><button type="button" class="btn secondary" id="journalCancel">キャンセル</button><button type="button" class="btn" id="journalAdd">一覧に追加</button></div></div>`;
   $('#main').innerHTML=`<div class="hero"><div><h1>日誌・患者情報取り込み</h1><p>実務試用版 Ver.${APP_VERSION} ／ 入院患者の手入力と配置</p></div></div>
   <div class="panel journal-warning"><b>手入力患者は実際の患者管理データに保存されます</b><p>写真の文字認識は未実装です。業務に必要な内容のみを入力し、正式な記録は電子カルテで管理してください。必要なら手動バックアップを利用できます。既存患者と同姓同名の場合は追加前に確認します。</p><label class="btn secondary journal-photo">📷 日誌の写真を選択・撮影<input type="file" id="journalPhoto" accept="image/*" style="display:none"></label><div id="journalPhotoInfo" class="notice"></div><div id="journalScanPreview"></div></div>
   <div class="panel"><h2>① 入院患者一覧　${admissions.length}名</h2><p class="notice">未配置の患者はここに残ります。ベッドへの配置が完了すると一覧から外れます。</p><div class="journal-table-wrap"><table class="journal-table"><thead><tr><th>氏名</th><th>入院日</th><th>現在地</th><th>配置先</th></tr></thead><tbody>${admissions.map(p=>`<tr><td>${esc(p.data['氏名']||'氏名未入力')}</td><td>${esc(p.data['入院日']||'')}</td><td>${esc(p.data['ベッド番号']||'未配置')}</td><td><button type="button" class="btn secondary journal-bed-btn" data-id="${esc(p.id)}">部屋選択</button></td></tr>`).join('')||'<tr><td colspan="4">ベッド配置待ちの患者はいません</td></tr>'}</tbody></table></div><button type="button" class="btn secondary journal-add-toggle" id="journalEntryToggle">${journalEntryOpen?'− 手入力を閉じる':'＋ 患者を手入力'}</button>${journalEntryOpen?entry:''}</div>
@@ -2897,16 +2897,43 @@ function renderJournalPreview(){
   });
   $('#journalEntryToggle').onclick=()=>{journalEntryOpen=!journalEntryOpen;renderJournalPreview()};
   if(journalEntryOpen){
+    // KANA06: capture IME reading in the Journal new-patient form, before
+    // the record is written. This never touches previously saved patients.
+    const jName=$('#journalNewName'),jKana=$('#journalNewKana'),jStatus=$('#journalKanaStatus'),jConfirm=$('#journalKanaConfirm');
+    let jConfirmedName='',jConfirmedKana='';
+    const jReview=()=>{
+      const name=jName.value.trim(),kana=jKana.value.trim();
+      const confirmed=!!kana&&jConfirmedName===name&&jConfirmedKana===kana;
+      jStatus.textContent=confirmed?'確認済み':(kana?'要確認':'未入力');
+      jConfirm.textContent=confirmed?'済':'確認';
+      jConfirm.disabled=confirmed||!name||!kana;
+    };
+    jName.addEventListener('input',jReview);
+    jName.addEventListener('compositionend',jReview);
+    jKana.addEventListener('input',jReview);
+    jKana.addEventListener('compositionend',jReview);
+    jConfirm.onclick=()=>{jConfirmedName=jName.value.trim();jConfirmedKana=jKana.value.trim();jReview()};
+    // Reuse the KANA05 component. Its ephemeral record is never persisted.
+    window.MSWKana05IME?.attach(jName,jKana,{_new:true,data:{}});
+    jReview();
     $('#journalNewBedPick').onclick=()=>showGroupedBedPicker($('#journalNewBed').value,value=>{$('#journalNewBed').value=value;$('#journalNewBedPick').textContent=(value||'その他・未配置')+' ▾'});
     $('#journalCancel').onclick=()=>{journalEntryOpen=false;renderJournalPreview()};
     $('#journalAdd').onclick=async()=>{
      const name=$('#journalNewName').value.trim(),date=$('#journalNewDate').value,bed=$('#journalNewBed').value;
+     const kana=$('#journalNewKana').value.trim();
      if(!name||!date){alert('氏名と入院日を入力してください。');return}
+     // Never persist an unreviewed suggestion. An empty reading continues to
+     // be allowed, just as in the previous Journal registration workflow.
+     if(kana&&(jConfirmedName!==name||jConfirmedKana!==kana)){
+       alert('フリガナを確認し、「確認」を押してから一覧に追加してください。');return;
+     }
      const matches=state.patients.filter(p=>!p.dischargeDate&&String(p.data['氏名']||'').replace(/\s/g,'')===name.replace(/\s/g,''));
      if(matches.length&&!confirm(`同じ氏名の入院患者が${matches.length}名います。既存患者を確認しましたか？\nそれでも新しく登録しますか？`))return;
      if(bed){const occupied=activePatients().filter(p=>normalizeBed(p.data['ベッド番号'])===normalizeBed(bed));if(occupied.length&&!confirm(`選択したベッドにはすでに${occupied.length}名登録されています。重複配置しますか？`))return;}
      const btn=$('#journalAdd');btn.disabled=true;
-     const p=newPatient(bed);p.data['氏名']=name;p.data['入院日']=date;p.journalAdmissionPending=!bed;delete p._new;
+     const p=newPatient(bed);p.data['氏名']=name;p.data['入院日']=date;p.journalAdmissionPending=!bed;
+     if(kana){p.data['フリガナ']=kana;p.furiganaConfirmed=true;p.furiganaConfirmedFor=name;}
+     delete p._new;
      state.patients.push(p);
      try{await save();journalEntryOpen=false;renderJournalPreview()}catch(e){state.patients=state.patients.filter(x=>x!==p);btn.disabled=false;alert('登録できませんでした：'+e.message)}
     };
