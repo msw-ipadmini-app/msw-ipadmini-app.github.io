@@ -2899,7 +2899,18 @@ function renderJournalPreview(){
   if(journalEntryOpen){
     // KANA06 streamlined journal workflow: display the IME candidate only.
     // A Journal reading remains unconfirmed until reviewed in Basic.
-    window.MSWKana05IME?.attach($('#journalNewName'),$('#journalNewKana'),{_new:true,data:{}});
+    const jName=$('#journalNewName'),jKana=$('#journalNewKana');
+    let candidateForName='';
+    // If text is changed without a new IME conversion, discard a stale
+    // suggestion instead of assigning it to a different patient name.
+    jKana.addEventListener('input',()=>{candidateForName=jKana.value?jName.value:'';});
+    jName.addEventListener('input',e=>{
+      if(e.isComposing)return;
+      if(jKana.value&&candidateForName&&jName.value!==candidateForName){
+        jKana.value='';candidateForName='';
+      }
+    });
+    window.MSWKana05IME?.attach(jName,jKana,{_new:true,data:{}});
     $('#journalNewBedPick').onclick=()=>showGroupedBedPicker($('#journalNewBed').value,value=>{$('#journalNewBed').value=value;$('#journalNewBedPick').textContent=(value||'その他・未配置')+' ▾'});
     $('#journalCancel').onclick=()=>{journalEntryOpen=false;renderJournalPreview()};
     $('#journalAdd').onclick=async()=>{
