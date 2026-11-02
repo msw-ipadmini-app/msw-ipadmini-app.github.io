@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261102-ptb01-backup-dev1';
+const CACHE=CACHE_PREFIX+'20261102-ptb02-verify-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -24,6 +24,7 @@ const ASSETS=[
   './kana02-addon.js?v=kana02-20261031-anon-diagnostic1',
   './kana05-new-patient-ime.js?v=kana05-new-ime-dev-20261102',
   './ptb01-patient-text-backup.js?v=ptb01-dev1-20261102',
+  './ptb02-backup-inspector.js?v=ptb02-verify-v1-20261102',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
