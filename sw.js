@@ -4,14 +4,14 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261104-ux04-batch-discharge-return-v1';
+const CACHE=CACHE_PREFIX+'20261104-ux05-drug-review-progress-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
   './styles.css?v=jp01-rx046-kana01-20261029',
   './app.js?v=ux04-batch-discharge-20261104-v1',
   './rx035-addon.js?v=jp01-rx046-20261028',
-  './rx036-master-editor.js?v=jp01-rx046-20261028',
+  './rx036-master-editor.js?v=ux05-review-20261104-v1',
   './rx037-structured-editor.js?v=jp01-rx046-20261028',
   './rx038-multiple-originals.js?v=jp01-rx046-20261028',
   './rx039-layout.js?v=jp01-rx046-20261028',
@@ -20,6 +20,7 @@ const ASSETS=[
   './rx045-patient-brand-search.js?v=jp01-rx046-20261028',
   './rx046-strength-sort.js?v=jp01-rx046-20261028',
   './rx047-drug-master-backup.js?v=rx047-litev01-20261031',
+  './ux05-drug-review-progress.js?v=ux05-review-20261104-v1',
   './kana02-core.js?v=kana03-20261031-coverage1',
   './kana02-addon.js?v=kana02-20261031-anon-diagnostic1',
   './kana05-new-patient-ime.js?v=kana05-new-ime-dev-20261102',
