@@ -147,6 +147,7 @@
     window.RX042?.install(form);
     window.RX043?.install(form);
     window.RX046?.install(form);
+    window.RX05?.install(form);
     form.querySelector('#rx036Delete').onclick=()=>{void deleteMasterDrug();};
     const drugList=main.querySelector('#drugList');
     if(drugList)drugList.insertAdjacentHTML('afterend',
@@ -229,6 +230,7 @@
     window.RX042?.open(form,editorOld);
     window.RX043?.open(form,editorOld);
     window.RX046?.open(form,editorOld);
+    window.RX05?.open(form,editorOld);
     form.querySelector('#rx036FormStatus').textContent='';
     form.hidden=false;
     form.scrollIntoView({behavior:'auto',block:'start'});
@@ -290,7 +292,7 @@
     const same=rows.findIndex((drug,i)=>(draftMode!=='edit'||i!==editorIndex)&&
       fields.every(f=>String(drug[f]??'').trim()===data[f]));
     if(same>=0){status.textContent='まったく同じ内容の薬剤が登録済みです。';return;}
-    if(draftMode==='edit'&&fields.every(f=>String(editorOld[f]??'').trim()===data[f])&&!rx037?.changed&&!rx038?.changed){
+    if(draftMode==='edit'&&fields.every(f=>String(editorOld[f]??'').trim()===data[f])&&!rx037?.changed&&!rx038?.changed&&!window.RX05?.changed(form,editorOld)){
       status.textContent='変更されていません。';return;
     }
     const action=draftMode==='new'?'新規登録':'編集';
@@ -307,6 +309,8 @@
       const savedDrug=draftMode==='new'?{...data}:{...editorOld,...data};
       if(rx037?.changed)savedDrug.rx037=rx037.value;
       if(rx038?.changed)savedDrug.rx038=rx038.value;
+      if(!window.RX05)throw new Error('薬情確認状態の表示部品を読み込めません。再起動してください。');
+      window.RX05.write(form,savedDrug);
       if(draftMode==='new')nextDrugs.push(savedDrug);
       else nextDrugs[editorIndex]=savedDrug;
       const next={...current,drugs:nextDrugs,version:APP_VERSION,updatedAt:nowISO()};
