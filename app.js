@@ -2816,6 +2816,7 @@ function bindPatientBedPicker(){
    {onDischarge:()=>startDischargeFlow()});
 }
 function startDischargeFlow(p=selectedPatient){
+ const fromPatientList=screen==='patients';
  if(!p)return;
  if(selectedPatient&&selectedPatient!==p){alert('別の患者情報が編集中です。退院処理を中止しました。');return;}
  if(p._new){alert('先に患者情報を保存してください。');return;}
@@ -2828,12 +2829,12 @@ function startDischargeFlow(p=selectedPatient){
   const date=$('#dischargeChosenDate').value;
   if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){alert('退院日を入力してください');return;}
   const admission=p.data['入院日'];if(admission&&/^\d{4}-\d{2}-\d{2}$/.test(admission)&&date<admission){alert('退院日は入院日以降を指定してください');return;}
-  $('#dischargeReviewBody').innerHTML=`<div class="panel"><p><b>退院処理を確定しますか？</b></p><p>${esc(p.data['氏名']||'氏名未入力')} ／ 退院日：${esc(date)} ／ 退院前：${esc(previousBed||'その他・未配置')}</p><button class="btn" id="dischargeCommit">確定して退院一覧へ</button></div>`;
+  $('#dischargeReviewBody').innerHTML=`<div class="panel"><p><b>退院処理を確定しますか？</b></p><p>${esc(p.data['氏名']||'氏名未入力')} ／ 退院日：${esc(date)} ／ 退院前：${esc(previousBed||'その他・未配置')}</p><button class="btn" id="dischargeCommit">${fromPatientList?'退院を確定して患者一覧へ戻る':'確定して退院一覧へ'}</button></div>`;
   $('#dischargeCommit').onclick=async()=>{
    const b=$('#dischargeCommit');b.disabled=true;
    if(selectedPatient===p&&!await flushPatientAutoSave()){b.disabled=false;alert('患者情報の自動保存に失敗しました。退院処理を中止しました。');return;}
    const old={date:p.dischargeDate,pending:p.summaryPending,bed:p.data['ベッド番号'],former:p.formerBed};
-   try{p.formerBed=previousBed;p.dischargeDate=date;p.summaryPending=true;p.data['ベッド番号']='';p.updatedAt=nowISO();await save();root.remove();$('#duplicateModal')?.remove();if(selectedPatient===p)closePatient();screen='journal';render()}
+   try{p.formerBed=previousBed;p.dischargeDate=date;p.summaryPending=true;p.data['ベッド番号']='';p.updatedAt=nowISO();await save();root.remove();$('#duplicateModal')?.remove();const hadPatientSheet=selectedPatient===p;if(hadPatientSheet)closePatient();if(fromPatientList){screen='patients';if(!hadPatientSheet)render()}else{screen='journal';render()}}
    catch(e){p.dischargeDate=old.date;p.summaryPending=old.pending;p.data['ベッド番号']=old.bed;p.formerBed=old.former;alert('保存できませんでした：'+e.message);b.disabled=false}
   };
  };
