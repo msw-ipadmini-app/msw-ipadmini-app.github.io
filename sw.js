@@ -4,12 +4,12 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261104-ux03-journal-patient-view-v1';
+const CACHE=CACHE_PREFIX+'20261104-ux04-batch-discharge-return-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
   './styles.css?v=jp01-rx046-kana01-20261029',
-  './app.js?v=kana06-journal-simple-20261102',
+  './app.js?v=ux04-batch-discharge-20261104-v1',
   './rx035-addon.js?v=jp01-rx046-20261028',
   './rx036-master-editor.js?v=jp01-rx046-20261028',
   './rx037-structured-editor.js?v=jp01-rx046-20261028',
