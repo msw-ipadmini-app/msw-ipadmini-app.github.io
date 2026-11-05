@@ -321,10 +321,11 @@
       state=next;ensureStateSchema();
       editorIndex=null;editorOld=null;
       if(screen==='drugs'){
+        // A successful save returns to the full unfiltered drug list.
+        // Keep the previous query and open editor intact on cancellation/failure.
         renderDrugs();
-        const q=document.querySelector('#dq');
-        if(q){q.value=data['薬名'];drawDrugs();}
         message('「'+data['薬名']+'」を'+action+'して保存しました。患者ごとの処方薬は変更していません。');
+        window.scrollTo(0,0);
       }
     }catch(e){
       if(status&&status.isConnected)status.textContent='保存できませんでした：'+String(e?.message||e).slice(0,160);

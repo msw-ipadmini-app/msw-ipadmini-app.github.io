@@ -4,14 +4,14 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261104-ux05-drug-review-progress-v1';
+const CACHE=CACHE_PREFIX+'20261105-ux06-drug-return-after-save-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
   './styles.css?v=jp01-rx046-kana01-20261029',
   './app.js?v=ux04-batch-discharge-20261104-v1',
   './rx035-addon.js?v=jp01-rx046-20261028',
-  './rx036-master-editor.js?v=ux05-review-20261104-v1',
+  './rx036-master-editor.js?v=ux06-drug-return-20261105-v1',
   './rx037-structured-editor.js?v=jp01-rx046-20261028',
   './rx038-multiple-originals.js?v=jp01-rx046-20261028',
   './rx039-layout.js?v=jp01-rx046-20261028',
