@@ -1,4 +1,4 @@
-/* UX08 (2026-11-06): clear patient search after a SAVED bed transfer, and
+/* UX08 v2 (2026-11-06): clear patient search after a SAVED bed transfer, and
  * restore the bed-map location viewed BEFORE searching. Other UX01 behavior
  * stays unchanged: no transfer => preserve query and scroll position.
  *
@@ -61,16 +61,17 @@
       const q=document.getElementById('q');
       if(q?.value.trim())return; // Never jump while another search is active.
       const scrolling=document.scrollingElement||document.documentElement;
-      const nodes=roomElements();
-      const key=snapshot?.room||roomKey(destination);
-      const matched=key?nodes.find(node=>roomFor(node)===key):null;
-      let target=Number(snapshot?.top||0);
-      if(matched){
-        const rect=matched.getBoundingClientRect();
-        // Preserve the original on-screen location of the room; when no
-        // pre-search snapshot exists, show the destination near the top.
-        const offset=snapshot?.room?Number(snapshot.offset||0):160;
-        target=Math.max(0,window.scrollY+rect.top-offset);
+      // The bed map has a fixed room order. Restore the exact PRE-SEARCH
+      // document scroll offset, rather than guessing which nearby room's
+      // heading represented the previous viewport (205 vs. 206).
+      let target=Number(snapshot?.top);
+      if(!snapshot||!Number.isFinite(target)){
+        // If a pre-search position could not be captured (e.g. a programmatic
+        // search), keep the destination room visible instead of going to top.
+        const key=roomKey(destination);
+        const matched=key?roomElements().find(node=>roomFor(node)===key):null;
+        target=matched?window.scrollY+matched.getBoundingClientRect().top-
+          Math.min(180,window.innerHeight*.3):window.scrollY;
       }
       const maxTop=Math.max(0,scrolling.scrollHeight-window.innerHeight);
       window.scrollTo(0,Math.min(Math.max(0,target),maxTop));
@@ -84,13 +85,19 @@
     requestAnimationFrame(()=>{apply();requestAnimationFrame(apply)});
   }
 
-  // The user may be looking at 206 when first tapping the search field.
-  // Capture BEFORE iPad keyboard focus/filtered rendering changes scroll.
-  document.addEventListener('focusin',event=>{
-    if(event.target?.id==='q'&&listVisible()&&!String(event.target.value||'').trim()){
-      beforeSearch=captureListLocation();
-    }
-  },true);
+  // iPad Safari may scroll the page WHEN the search box gets focus.
+  // Pointer/touch DOWN precedes the focus-induced scroll and keyboard resize.
+  // Store the untouched full bed-map viewport once, before any search redraw.
+  function capturePreSearch(event){
+    if(event.target?.id!=='q'||!listVisible()||beforeSearch||
+       String(event.target.value||'').trim())return;
+    beforeSearch=captureListLocation();
+  }
+  document.addEventListener('pointerdown',capturePreSearch,true);
+  document.addEventListener('touchstart',capturePreSearch,{capture:true,passive:true});
+  // Keyboard-only navigation remains supported, without overriding a more
+  // accurate snapshot already taken by pointer/touch.
+  document.addEventListener('focusin',capturePreSearch,true);
 
   window.drawPatientList=function(...args){
     const query=String(document.getElementById('q')?.value||'').trim();
