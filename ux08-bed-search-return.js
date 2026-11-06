@@ -1,154 +1,149 @@
-/* UX08 v2 (2026-11-06): clear patient search after a SAVED bed transfer, and
- * restore the bed-map location viewed BEFORE searching. Other UX01 behavior
- * stays unchanged: no transfer => preserve query and scroll position.
- *
- * Volatile UI-only state; no patient storage, backup, IndexedDB or network.
+/* UX08 v3 (2026-11-06): When a searched patient was MOVED and saved,
+ * clear patient search and restore the real pre-search bed-map viewport.
+ * All state is transient UI state; no patient or master data writes.
  */
 (function(){
-  'use strict';
-  if(window.__MSW_UX08_BED_SEARCH_RETURN_INSTALLED__)return;
-  if(typeof window.openPatient!=='function'||typeof window.closePatient!=='function'||
-     typeof window.drawPatientList!=='function')return;
-
-  const oldOpen=window.openPatient;
-  const oldClose=window.closePatient; // UX01 has already wrapped this.
-  const oldDraw=window.drawPatientList;
-  let beforeSearch=null;
-  let opened=null;
-  let drawnQuery=String(document.getElementById('q')?.value||'').trim();
-  let movingBack=false;
-
-  function listVisible(){
-    return typeof screen!=='undefined'&&screen==='patients'&&
-      !!document.getElementById('patientList')&&!document.getElementById('modal');
-  }
-  function bedKey(value){
-    return String(value||'').trim().replace(/\s+/g,'')
-      .replace(/[‐-‒–—―ー－]/g,'-').toUpperCase();
-  }
-  function roomKey(value){
-    const bed=bedKey(value);
-    return bed.startsWith('ICU')?bed.match(/^ICU[1-3]/)?.[0]||'':bed.match(/^\d{3}/)?.[0]||'';
-  }
-  function roomElements(){
-    return [...document.querySelectorAll('#patientList .room-map-item')];
-  }
-  function roomFor(el){
-    const label=el.querySelector('.room-title')?.textContent||'';
-    return label.match(/ICU[1-3]|\d{3}/)?.[0]||'';
-  }
-  function captureListLocation(){
-    const scrolling=document.scrollingElement||document.documentElement;
-    const y=Math.max(0,Number(window.scrollY||scrolling?.scrollTop||0));
-    const horizontal=[...document.querySelectorAll('#patientList .compact-room-scroll')]
-      .map(node=>node.scrollLeft);
-    const nodes=roomElements();
-    // Use a visible room, not a patient name, as a stable vertical anchor.
-    const focusY=Math.min(200,Math.max(110,window.innerHeight*.25));
-    const inView=nodes.filter(node=>{
-      const r=node.getBoundingClientRect();
-      return r.bottom>65&&r.top<window.innerHeight-35;
-    });
-    const best=inView.sort((a,b)=>
-      Math.abs(a.getBoundingClientRect().top-focusY)-
-      Math.abs(b.getBoundingClientRect().top-focusY))[0];
-    const r=best?.getBoundingClientRect();
-    return {top:y,horizontal,room:best?roomFor(best):'',offset:r?r.top:0};
-  }
-  function restoreListLocation(snapshot,destination){
-    function apply(){
-      if(!listVisible())return;
-      const q=document.getElementById('q');
-      if(q?.value.trim())return; // Never jump while another search is active.
-      const scrolling=document.scrollingElement||document.documentElement;
-      // The bed map has a fixed room order. Restore the exact PRE-SEARCH
-      // document scroll offset, rather than guessing which nearby room's
-      // heading represented the previous viewport (205 vs. 206).
-      let target=Number(snapshot?.top);
-      if(!snapshot||!Number.isFinite(target)){
-        // If a pre-search position could not be captured (e.g. a programmatic
-        // search), keep the destination room visible instead of going to top.
-        const key=roomKey(destination);
-        const matched=key?roomElements().find(node=>roomFor(node)===key):null;
-        target=matched?window.scrollY+matched.getBoundingClientRect().top-
-          Math.min(180,window.innerHeight*.3):window.scrollY;
-      }
-      const maxTop=Math.max(0,scrolling.scrollHeight-window.innerHeight);
-      window.scrollTo(0,Math.min(Math.max(0,target),maxTop));
-      if(snapshot?.horizontal?.length){
-        document.querySelectorAll('#patientList .compact-room-scroll').forEach((el,i)=>{
-          el.scrollLeft=snapshot.horizontal[i]||0;
-        });
-      }
-    }
-    apply();
-    requestAnimationFrame(()=>{apply();requestAnimationFrame(apply)});
-  }
-
-  // iPad Safari may scroll the page WHEN the search box gets focus.
-  // Pointer/touch DOWN precedes the focus-induced scroll and keyboard resize.
-  // Store the untouched full bed-map viewport once, before any search redraw.
-  function capturePreSearch(event){
-    if(event.target?.id!=='q'||!listVisible()||beforeSearch||
-       String(event.target.value||'').trim())return;
-    beforeSearch=captureListLocation();
-  }
-  document.addEventListener('pointerdown',capturePreSearch,true);
-  document.addEventListener('touchstart',capturePreSearch,{capture:true,passive:true});
-  // Keyboard-only navigation remains supported, without overriding a more
-  // accurate snapshot already taken by pointer/touch.
-  document.addEventListener('focusin',capturePreSearch,true);
-
-  window.drawPatientList=function(...args){
-    const query=String(document.getElementById('q')?.value||'').trim();
-    if(query&&!drawnQuery&&listVisible()&&!beforeSearch){
-      // The current map is still unfiltered: capture before the old draw.
-      beforeSearch=captureListLocation();
-    }
-    if(!query&&drawnQuery&&!movingBack)beforeSearch=null;
-    const result=oldDraw.apply(this,args);
-    drawnQuery=query;
-    return result;
-  };
-
-  window.openPatient=function(patient,...args){
-    const fromList=listVisible();
-    opened=fromList&&patient?{
-      id:patient.id,
-      originalBed:bedKey(patient.data?.['ベッド番号']),
-      searched:Boolean(String(document.getElementById('q')?.value||'').trim()),
-      fallback:fromList?captureListLocation():null
-    }:null;
-    return oldOpen.call(this,patient,...args);
-  };
-
-  window.closePatient=function(...args){
-    const patient=typeof selectedPatient!=='undefined'?selectedPatient:null;
-    const valid=opened&&patient&&opened.id===patient.id;
-    const transferred=valid&&opened.searched&&
-      (typeof screen!=='undefined'&&screen==='patients')&&
-      !patient.dischargeDate&&!patient._new&&
-      bedKey(patient.data?.['ベッド番号'])!==opened.originalBed;
-    const destination=transferred?patient.data?.['ベッド番号']:'';
-    const snapshot=transferred?beforeSearch:null;
-    opened=null;
-    if(!transferred)return oldClose.apply(this,args);
-
-    movingBack=true;
-    // The app keeps its own volatile search state. Clearing the input alone
-    // would cause renderPatients() to restore the stale searched query.
-    patientListSearchQuery='';
-    const search=document.getElementById('q');
-    if(search)search.value='';
-    try{
-      const result=oldClose.apply(this,args); // UX01's normal close behavior.
-      beforeSearch=null;
-      restoreListLocation(snapshot,destination);
-      return result;
-    }finally{
-      movingBack=false;
-    }
-  };
-
-  window.__MSW_UX08_BED_SEARCH_RETURN_INSTALLED__=true;
+ 'use strict';
+ if(window.__MSW_UX08_BED_SEARCH_RETURN_INSTALLED__)return;
+ if(typeof window.openPatient!=='function'||typeof window.closePatient!=='function'||
+    typeof window.drawPatientList!=='function')return;
+ const originalOpen=window.openPatient;
+ const originalClose=window.closePatient;  // UX01 already wraps this.
+ const originalDraw=window.drawPatientList;
+ let lastUnfiltered=null, beforeSearch=null, opened=null;
+ let lastDrawnQuery=String(document.getElementById('q')?.value||'').trim();
+ let returning=false,restoreToken=0;
+ const scrollRoot=()=>document.scrollingElement||document.documentElement;
+ const scrollTop=()=>Math.max(0,Number(scrollRoot()?.scrollTop||window.scrollY||0));
+ const normalizeBed=bed=>String(bed||'').trim().toUpperCase().replace(/\s+/g,'')
+   .replace(/[‐-‒–—―ー－]/g,'-');
+ const roomKey=bed=>normalizeBed(bed)
+   .match(/^(ICU[1-3]|\d{3})(?:-|$)/)?.[1]||'';
+ const roomName=node=>node.querySelector('.room-title')?.textContent?.trim()
+   .match(/ICU[1-3]|\d{3}/)?.[0]||'';
+ function listVisible(){
+   return typeof screen!=='undefined'&&screen==='patients'&&
+    !!document.getElementById('patientList')&&!document.getElementById('modal');
+ }
+ function isUnfiltered(){return listVisible()&&!String(document.getElementById('q')?.value||'').trim();}
+ function capture(){
+   const viewport=window.innerHeight;
+   const offsets=Object.create(null);
+   document.querySelectorAll('#patientList .room-map-item, #patientList .icu-map .room-block').forEach(node=>{
+     const key=roomName(node),rect=node.getBoundingClientRect();
+     if(key&&rect.bottom>0&&rect.top<viewport)offsets[key]=rect.top;
+   });
+   return {top:scrollTop(),offsets,
+     horizontal:[...document.querySelectorAll('#patientList .compact-room-scroll')].map(n=>n.scrollLeft)};
+ }
+ function rememberUnfiltered(){
+   if(isUnfiltered()&&!returning&&document.activeElement?.id!=='q')
+     lastUnfiltered=capture();
+ }
+ // Cache a settled bed-map location while the user scrolls. iPad may move the
+ // page to reveal the input *before* focus events, so never rely solely on focus.
+ document.addEventListener('scroll',rememberUnfiltered,{capture:true,passive:true});
+ // Do not auto-scroll again if the user resumes touching/scrolling the page.
+ ['pointerdown','touchstart','wheel','keydown'].forEach(type=>
+   document.addEventListener(type,()=>{restoreToken++;},{capture:true,passive:true}));
+ document.addEventListener('touchend',rememberUnfiltered,{capture:true,passive:true});
+ function rememberBeforeTyping(e){
+   if(e.target?.id!=='q'||!isUnfiltered()||beforeSearch)return;
+   beforeSearch=lastUnfiltered||capture();
+ }
+ document.addEventListener('pointerdown',rememberBeforeTyping,true);
+ document.addEventListener('touchstart',rememberBeforeTyping,{capture:true,passive:true});
+ document.addEventListener('focusin',rememberBeforeTyping,true);
+ document.addEventListener('focusout',e=>{
+   if(e.target?.id==='q'&&!String(e.target.value||'').trim()&&!lastDrawnQuery)
+     beforeSearch=null;
+ },true);
+ window.drawPatientList=function(...args){
+   const query=String(document.getElementById('q')?.value||'').trim();
+   if(query&&!lastDrawnQuery&&!beforeSearch&&listVisible())
+     beforeSearch=lastUnfiltered||capture();
+   if(!query&&lastDrawnQuery&&!returning)beforeSearch=null;
+   const result=originalDraw.apply(this,args);
+   lastDrawnQuery=query;
+   if(!query&&!returning&&listVisible())requestAnimationFrame(rememberUnfiltered);
+   return result;
+ };
+ window.openPatient=function(patient,...args){
+   const fromList=listVisible();
+   opened=fromList&&patient?{
+     id:patient.id,
+     bed:normalizeBed(patient.data?.['ベッド番号']),
+     searched:!!String(document.getElementById('q')?.value||'').trim()
+   }:null;
+   return originalOpen.call(this,patient,...args);
+ };
+ function restore(snapshot,destination){
+   const token=++restoreToken;
+   function apply(){
+     if(token!==restoreToken||!isUnfiltered())return;
+     const offsets=snapshot?.offsets||{};
+     const rooms=[...document.querySelectorAll('#patientList .room-map-item, #patientList .icu-map .room-block')];
+     const destinationRoom=roomKey(destination);
+     // Prefer exact on-screen offset of the DESTINATION room if it was visible
+     // before searching. This avoids accidentally anchoring adjacent room 205.
+     let anchor='',offset=0;
+     if(destinationRoom&&Number.isFinite(offsets[destinationRoom])){
+       anchor=destinationRoom;offset=offsets[destinationRoom];
+     }else{
+       for(const key of Object.keys(offsets)){
+         if(rooms.some(node=>roomName(node)===key)){
+           anchor=key;offset=offsets[key];break;
+         }
+       }
+     }
+     let target=Number(snapshot?.top);
+     if(anchor){
+       const found=rooms.find(node=>roomName(node)===anchor);
+       if(found)target=scrollTop()+found.getBoundingClientRect().top-offset;
+     }
+     if(!Number.isFinite(target)){
+       // No reliable saved position? Show the new bed rather than page top.
+       const found=rooms.find(node=>roomName(node)===destinationRoom);
+       target=found?scrollTop()+found.getBoundingClientRect().top-
+         Math.max(100,window.innerHeight*.25):scrollTop();
+     }
+     const scrolling=scrollRoot();
+     const max=Math.max(0,scrolling.scrollHeight-window.innerHeight);
+     const next=Math.max(0,Math.min(target,max));
+     scrolling.scrollTop=next;
+     window.scrollTo(0,next);
+     if(snapshot?.horizontal?.length){
+       document.querySelectorAll('#patientList .compact-room-scroll').forEach((el,i)=>{
+         el.scrollLeft=snapshot.horizontal[i]||0;
+       });
+     }
+   }
+   apply();
+   requestAnimationFrame(()=>{apply();requestAnimationFrame(apply)});
+   // UIKit can restore the scroll position when the keyboard disappears after
+   // the DOM has been rendered. Re-apply only if still on the same list.
+   [120,360,700].forEach(ms=>setTimeout(apply,ms));
+ }
+ window.closePatient=function(...args){
+   const p=typeof selectedPatient!=='undefined'?selectedPatient:null;
+   const transfer=opened&&p&&opened.id===p.id&&opened.searched&&
+     typeof screen!=='undefined'&&screen==='patients'&&
+     !p.dischargeDate&&!p._new&&
+     opened.bed!==normalizeBed(p.data?.['ベッド番号']);
+   const dest=transfer?p.data?.['ベッド番号']:'';
+   const snapshot=transfer?(beforeSearch||lastUnfiltered):null;
+   opened=null;
+   if(!transfer)return originalClose.apply(this,args);
+   returning=true;
+   // Reset both user-visible and app-internal query before render().
+   patientListSearchQuery='';
+   const q=document.getElementById('q');if(q)q.value='';
+   try{
+     const result=originalClose.apply(this,args);
+     beforeSearch=null;
+     restore(snapshot,dest);
+     return result;
+   }finally{returning=false;}
+ };
+ window.__MSW_UX08_BED_SEARCH_RETURN_INSTALLED__=true;
 })();
