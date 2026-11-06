@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261105-ux07-morning-fourup-v1';
+const CACHE=CACHE_PREFIX+'20261106-ux08-bed-search-return-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -30,6 +30,7 @@ const ASSETS=[
   './ux02-journal-discharge.js?v=ux02-journal-discharge-20261104-v1',
   './ux03-journal-patient-view.js?v=ux03-journal-patient-view-20261104-v1',
   './ux07-morning-print-fourup.js?v=ux07-fourup-20261105-v1',
+  './ux08-bed-search-return.js?v=ux08-transfer-return-20261106-v1',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
