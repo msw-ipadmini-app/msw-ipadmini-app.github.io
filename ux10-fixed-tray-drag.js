@@ -1,13 +1,12 @@
-/* UX10 stage (2026-11-11): fixed unplaced tray and touch drag on existing bed map.
- * All data writes use the app's encrypted save(); no direct IndexedDB or network.
- * Until separate approval this script exists ONLY on a development branch.
+/* UX11 development: scroll-first native long press with no arrow handles.
+ * UX10 save/confirmation/rollback retained. Test-only until separate production approval.
  */
 (function(){
 'use strict';
 if(window.__MSW_UX10_INSTALLED__)return;
 if(typeof window.drawPatientList!=='function'||typeof window.save!=='function')return;
 const priorDraw=window.drawPatientList;
-let folded=false,selected=null,drag=null,hover=null,ghost=null,confirming=false,saving=false,ignoreClick=0,toastSeq=0;
+let folded=false,selected=null,drag=null,hover=null,ghost=null,confirming=false,saving=false,ignoreClick=0,ignoreClickSource=null,toastSeq=0;
 const patient=id=>state?.patients?.find(p=>String(p.id)===String(id)&&!p.dischargeDate)||null;
 const mapped=bed=>typeof isMappedBed==='function'&&isMappedBed(bed);
 const active=()=>!!(typeof key!=='undefined'&&key&&state&&screen==='patients'&&
@@ -22,31 +21,13 @@ function toast(message){
  el.textContent=message;const n=++toastSeq;
  setTimeout(()=>{if(n===toastSeq)el.remove()},2500);
 }
-function attachHandle(parent,id,fromTray=false){
- const p=patient(id);if(!p||parent.querySelector('.ux10-handle'))return;
- const handle=document.createElement('span');handle.className='ux10-handle';
- handle.setAttribute('role','button');handle.setAttribute('tabindex','0');
- handle.setAttribute('aria-label',(p.data?.['氏名']||'氏名未入力')+'を移動');
- handle.textContent='↗';handle.dataset.ux10Id=p.id;
- if(!fromTray)parent.classList.add('ux10-movable');
- parent.appendChild(handle);
- handle.addEventListener('click',ev=>{
-   ev.preventDefault();ev.stopImmediatePropagation();
-   if(Date.now()<ignoreClick||saving)return;
-   select(p.id);
- });
- handle.addEventListener('keydown',ev=>{
-   if(ev.key==='Enter'||ev.key===' '){ev.preventDefault();ev.stopPropagation();select(p.id)}
- });
- bindDrag(handle);
-}
 function select(id){
  if(!active()||editing()||saving)return;
  selected=selected===id?null:id;
  document.querySelectorAll('.ux10-selected').forEach(x=>x.classList.remove('ux10-selected'));
  if(selected){
-   document.querySelectorAll('[data-ux10-id]').forEach(x=>{
-     if(x.dataset.ux10Id===selected)x.parentElement?.classList.add('ux10-selected');
+   document.querySelectorAll('[data-ux11-id]').forEach(x=>{
+     if(x.dataset.ux11Id===selected)x.classList.add('ux10-selected');
    });
    toast((patient(selected)?.data?.['氏名']||'患者')+'を選択。移動先をタップしてください');
  }else toast('移動する患者の選択を解除しました');
@@ -68,7 +49,7 @@ function paintTray(){
    const name=document.createElement('strong');name.textContent=p.data?.['氏名']||'氏名未入力';
    const note=document.createElement('small');
    note.textContent=p.ux10PendingFromBed?'元 '+p.ux10PendingFromBed+' ／ 移動先確認中':'未配置（新規入院等）';
-   card.append(name,note);row.appendChild(card);attachHandle(card,p.id,true);
+   card.append(name,note);row.appendChild(card);bindLongPress(card,p.id,true);
  }
 }
 function sync(){
@@ -86,7 +67,7 @@ function sync(){
  }
  paintTray();
  document.querySelectorAll('#patientList .occupied-bed[data-id]:not(.duplicate-bed)').forEach(el=>{
-   if(!el.querySelector('.ux10-handle'))attachHandle(el,el.dataset.id);
+   bindLongPress(el,el.dataset.id);
  });
 }
 window.drawPatientList=function(...args){
@@ -107,55 +88,112 @@ function highlight(next){
  hover?.node?.classList.remove('ux10-drop-hover');
  hover=next;hover?.node?.classList.add('ux10-drop-hover');
 }
-function bindDrag(handle){
- let down=null,arm=null;
- function clean(){
-   clearTimeout(arm);arm=null;down=null;drag=null;
+/* UX11: native scrolling wins until an unmoving 600 ms long press.
+ * Touch events are intentionally passive on start; preventDefault is used
+ * only after the long-press has fired, never during normal scrolling. */
+const HOLD_MS=600, MOVE_CANCEL_PX=12;
+function bindLongPress(node,id,fromTray=false){
+ if(node.dataset.ux11Ready==='1')return;
+ node.dataset.ux11Ready='1';node.dataset.ux11Id=id;
+ node.classList.add('ux11-movable');
+ let gesture=null,timer=null;
+ const clearTimer=()=>{if(timer!==null){clearTimeout(timer);timer=null}};
+ function cleanup(){
+   clearTimer();gesture=null;drag=null;
    ghost?.remove();ghost=null;highlight(null);
+   node.classList.remove('ux11-holding');
  }
- function start(e){
-   if(!down||drag||saving||confirming||!active())return;
-   const p=patient(down.id);if(!p)return;
-   drag={id:p.id};selected=null;
-   ghost=document.createElement('div');ghost.id='ux10Ghost';
-   ghost.textContent='↗ '+(p.data?.['氏名']||'氏名未入力');
-   document.body.appendChild(ghost);
-   ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';
+ function arm(x,y,kind,token){
+   if(saving||confirming||!active()||editing()||!patient(id))return;
+   cleanup();gesture={x,y,lastX:x,lastY:y,kind,token,armed:false};
+   timer=setTimeout(()=>{
+     timer=null;
+     if(!gesture||gesture.armed||saving||confirming||!active()||editing()||!patient(id))return;
+     gesture.armed=true;drag={id};
+     selected=null;
+     document.querySelectorAll('.ux10-selected').forEach(x=>x.classList.remove('ux10-selected'));
+     node.classList.add('ux11-holding');
+     const p=patient(id);
+     ghost=document.createElement('div');ghost.id='ux10Ghost';
+     ghost.textContent='移動：'+(p?.data?.['氏名']||'氏名未入力');
+     document.body.appendChild(ghost);
+     ghost.style.left=gesture.lastX+'px';ghost.style.top=gesture.lastY+'px';
+   },HOLD_MS);
  }
- handle.addEventListener('pointerdown',e=>{
-   e.stopPropagation();
-   if(e.button!==0||saving||!active()||editing())return;
-   down={id:handle.dataset.ux10Id,x:e.clientX,y:e.clientY,pointerId:e.pointerId};
-   try{handle.setPointerCapture(e.pointerId)}catch(_){}
-   arm=setTimeout(()=>{if(down)start({clientX:down.x,clientY:down.y})},260);
- });
- handle.addEventListener('pointermove',e=>{
-   if(!down||e.pointerId!==down.pointerId)return;
-   e.stopPropagation();
-   if(!drag&&Math.hypot(e.clientX-down.x,e.clientY-down.y)>9){clearTimeout(arm);arm=null;start(e)}
-   if(drag){
-     e.preventDefault();ghost.style.left=e.clientX+'px';ghost.style.top=e.clientY+'px';
-     highlight(dropTarget(document.elementFromPoint(e.clientX,e.clientY)));
+ function move(x,y,event){
+   if(!gesture)return;
+   const dist=Math.hypot(x-gesture.x,y-gesture.y);
+   if(!gesture.armed){
+     if(dist>MOVE_CANCEL_PX)cleanup(); // native vertical/horizontal scroll continues
+     return;
    }
- });
- handle.addEventListener('pointerup',e=>{
-   if(!down||e.pointerId!==down.pointerId)return;
-   e.stopPropagation();
-   const hasDrag=!!drag,id=down.id;
-   const target=hasDrag?dropTarget(document.elementFromPoint(e.clientX,e.clientY)):null;
-   clean();
-   if(hasDrag){
-     ignoreClick=Date.now()+600;e.preventDefault();
-     if(target)requestMove(id,target.to);
-     else toast('移動先が見つかりません。↗で選択してから移動先をタップすることもできます');
+   if(event.cancelable)event.preventDefault();
+   event.stopPropagation();
+   gesture.lastX=x;gesture.lastY=y;
+   if(ghost){ghost.style.left=x+'px';ghost.style.top=y+'px'}
+   highlight(dropTarget(document.elementFromPoint(x,y)));
+ }
+ function finish(x,y,event){
+   if(!gesture)return;
+   const held=gesture.armed;
+   if(!held){cleanup();return}
+   if(event.cancelable)event.preventDefault();
+   event.stopPropagation();
+   ignoreClick=Date.now()+900;ignoreClickSource=node;
+   const dest=dropTarget(document.elementFromPoint(x,y));
+   cleanup();
+   const from=patient(id)?.data?.['ベッド番号']||'';
+   if(dest&&normalizeBed(dest.to)!==normalizeBed(from)){
+     requestMove(id,dest.to); // always opens confirmation before encrypted save
+   }else{
+     select(id); // release on same bed => tap destination; no data change
+     toast('移動する患者を選びました。移動先のベッドか「その他・未配置」をタップ');
    }
+ }
+ node.addEventListener('touchstart',e=>{
+   if(e.touches.length!==1)return;
+   const t=e.changedTouches[0];
+   arm(t.clientX,t.clientY,'touch',t.identifier);
+ },{passive:true});
+ node.addEventListener('touchmove',e=>{
+   if(!gesture||gesture.kind!=='touch')return;
+   const t=[...e.changedTouches].find(t=>t.identifier===gesture.token);
+   if(t)move(t.clientX,t.clientY,e);
+ },{passive:false});
+ node.addEventListener('touchend',e=>{
+   if(!gesture||gesture.kind!=='touch')return;
+   const t=[...e.changedTouches].find(t=>t.identifier===gesture.token);
+   if(t)finish(t.clientX,t.clientY,e);
+ },{passive:false});
+ node.addEventListener('touchcancel',()=>{if(gesture?.kind==='touch')cleanup()});
+ node.addEventListener('pointerdown',e=>{
+   if(e.pointerType==='touch'||e.button!==0)return;
+   arm(e.clientX,e.clientY,'pointer',e.pointerId);
+   if(gesture){try{node.setPointerCapture(e.pointerId)}catch(_){}}
  });
- handle.addEventListener('pointercancel',clean);
- handle.addEventListener('lostpointercapture',()=>{if(down)clean()});
+ node.addEventListener('pointermove',e=>{
+   if(gesture?.kind==='pointer'&&e.pointerId===gesture.token)move(e.clientX,e.clientY,e);
+ });
+ node.addEventListener('pointerup',e=>{
+   if(gesture?.kind==='pointer'&&e.pointerId===gesture.token)finish(e.clientX,e.clientY,e);
+ });
+ node.addEventListener('pointercancel',()=>{if(gesture?.kind==='pointer')cleanup()});
+ node.addEventListener('lostpointercapture',()=>{if(gesture?.kind==='pointer')cleanup()});
+ node.addEventListener('contextmenu',e=>{e.preventDefault()});
+ if(fromTray){
+   node.addEventListener('click',()=>{
+     if(saving||confirming||!active()||editing()||selected)return;
+     const p=patient(id);
+     if(p&&typeof openPatient==='function')openPatient(p);
+   });
+ }
 }
 document.addEventListener('click',e=>{
- if(!selected||Date.now()<ignoreClick||confirming||saving||!active())return;
- if(e.target.closest('.ux10-handle,.ux10-toggle,#ux10Confirm'))return;
+ if(Date.now()<ignoreClick&&ignoreClickSource?.contains(e.target)){
+   e.preventDefault();e.stopImmediatePropagation();return;
+ }
+ if(!selected||confirming||saving||!active())return;
+ if(e.target.closest('.ux10-toggle,#ux10Confirm'))return;
  const target=dropTarget(e.target);if(!target)return;
  e.preventDefault();e.stopImmediatePropagation();requestMove(selected,target.to);
 },true);
