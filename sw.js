@@ -32,7 +32,7 @@ const ASSETS=[
   './ux07-morning-print-fourup.js?v=ux07-fourup-20261105-v1',
   './ux08-bed-search-return.js?v=ux08-transfer-return-20261106-v3',
   './ux10-fixed-tray-drag.js?v=ux11-longpress-20261111-v1',
-  './ux12-tray-visibility.js?v=ux12-20261112-v1',
+  './ux12-tray-visibility.js?v=ux12-20261112-v2',
   './ux10-fixed-tray-drag.css?v=ux11-longpress-20261111-v1',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
