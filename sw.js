@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261111-ux10-fixed-tray-development-v2';
+const CACHE=CACHE_PREFIX+'20261111-ux11-longpress-development-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -31,8 +31,8 @@ const ASSETS=[
   './ux03-journal-patient-view.js?v=ux03-journal-patient-view-20261104-v1',
   './ux07-morning-print-fourup.js?v=ux07-fourup-20261105-v1',
   './ux08-bed-search-return.js?v=ux08-transfer-return-20261106-v3',
-  './ux10-fixed-tray-drag.js?v=ux10-dev-20261111-v1',
-  './ux10-fixed-tray-drag.css?v=ux10-dev-20261111-v2',
+  './ux10-fixed-tray-drag.js?v=ux11-longpress-20261111-v1',
+  './ux10-fixed-tray-drag.css?v=ux11-longpress-20261111-v1',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
