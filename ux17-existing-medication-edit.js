@@ -40,7 +40,18 @@
     const host=row.querySelector(':scope > .ux17-med-more');
     if(!host||!record)return;
     const existing=host.querySelector('.ux17-existing-edit');
-    if(existing){existing.remove();return;}
+    const priceEditor=host.querySelector('.patient-med-editor');
+    if(existing){
+      if(priceEditor&&priceEditor.dataset.medDirty==='1'){
+        const flags=existing.dataset.ux17OwnDirty==='1';
+        if(flags&&existing.dataset.ux17PriceDirty!=='1')priceEditor.dataset.medDirty='0';
+      }
+      existing.remove();return;
+    }
+    if(priceEditor?.dataset.medDirty==='1'){
+      alert('薬価・規格に未保存の変更があります。先に保存または取り消してください。');
+      return;
+    }
     const id=record.id,pricing=record.pricing||{},schedule=record.ux17Schedule||{};
     const panel=control('div');
     panel.className='ux17-existing-edit';
@@ -64,14 +75,19 @@
     notice.className='notice';panel.append(notice);
     const message=control('p');message.className='notice';message.setAttribute('role','status');panel.append(message);
     const actions=control('div');actions.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
-    actions.append(button('キャンセル',()=>panel.remove()));
+    actions.append(button('キャンセル',()=>{
+      if(priceEditor?.dataset.medDirty==='1'&&panel.dataset.ux17OwnDirty==='1'&&
+         panel.dataset.ux17PriceDirty!=='1')priceEditor.dataset.medDirty='0';
+      panel.remove();
+    }));
     actions.append(button('内容を確認して保存',async()=>{
       if(patientMedicationBusy)return;
       const patient=selectedPatient;
       if(!patient||!key||!state||patient._new||!Array.isArray(patient.medications)){
         message.textContent='ロック状態または患者データを確認してください。';return;
       }
-      if(row.querySelector('.patient-med-editor[data-med-dirty="1"]')){
+      if(panel.dataset.ux17PriceDirty==='1'||
+         (priceEditor?.dataset.medDirty==='1'&&panel.dataset.ux17OwnDirty!=='1')){
         message.textContent='薬価・規格の未保存変更があります。先に保存または取り消してください。';return;
       }
       const current=readRecord(id);
@@ -117,15 +133,29 @@
       }catch(e){
         patient.medications=before;
         if(selectedPatient===patient){
-          drawPatientMedicationList();
-          const status=document.querySelector('#patientMedStatus');
-          if(status)status.textContent='保存できず、元に戻しました：'+String(e.message||e).slice(0,100);
+          // Keep typed inputs for a safe retry after a transient write failure.
+          message.textContent='保存できず、元に戻しました：'+String(e.message||e).slice(0,100);
         }
       }finally{patientMedicationBusy=false;}
     }));
     panel.append(actions);
-    const point=host.querySelector('.patient-med-editor');
+    const point=priceEditor;
     if(point)host.insertBefore(panel,point);else host.append(panel);
+    for(const input of panel.querySelectorAll('input,select')){
+      const mark=()=>{
+        panel.dataset.ux17OwnDirty='1';
+        if(priceEditor)priceEditor.dataset.medDirty='1';
+      };
+      input.addEventListener('input',mark);
+      input.addEventListener('change',mark);
+    }
+    if(priceEditor){
+      for(const input of priceEditor.querySelectorAll('input,select')){
+        const mark=()=>{panel.dataset.ux17PriceDirty='1';};
+        input.addEventListener('input',mark);
+        input.addEventListener('change',mark);
+      }
+    }
   }
   function addControls(){
     const root=document.querySelector('#tabbody .patient-med-page');
