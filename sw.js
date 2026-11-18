@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261118-ux17-patient-medication-v1';
+const CACHE=CACHE_PREFIX+'20261118-ux17-fix01-visible-edit-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -38,7 +38,7 @@ const ASSETS=[
   './ux16-journal-entry-scroll.js?v=ux16-20261118-v1',
   './ux17-patient-med-layout.js?v=ux17-20261118-v1',
   './ux17-medication-compact-list.js?v=ux17-20261118-v1',
-  './ux17-existing-medication-edit.js?v=ux17-20261118-v1',
+  './ux17-existing-medication-edit.js?v=ux17-fix01-visible-edit-20261118-v1',
   './ux17-generic-choices.js?v=ux17-20261118-v1',
   './ux17-selection-wizard.js?v=ux17-20261118-v1',
   './ux17-prescription-print.js?v=ux17-20261118-v1',
