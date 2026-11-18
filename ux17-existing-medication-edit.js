@@ -1,4 +1,4 @@
-/* UX17 production: complete or correct dose/timing for an EXISTING drug.
+/* UX17-FIX01 production: visible per-row edit of dose/timing for an EXISTING drug.
  * Preserves medication id, named brand snapshot, notes, original selected
  * product, attached RX035 reference, and historical metadata.
  * Atomic encrypted save with rollback; no mutation of drug master.
@@ -141,6 +141,12 @@
     panel.append(actions);
     const point=priceEditor;
     if(point)host.insertBefore(panel,point);else host.append(panel);
+    // The edit launcher is always visible; expand the previously collapsed
+    // details before displaying the editor. No need to delete/re-add the drug.
+    host.open=true;
+    if(typeof panel.scrollIntoView==='function'){
+      panel.scrollIntoView({block:'nearest',behavior:'smooth'});
+    }
     for(const input of panel.querySelectorAll('input,select')){
       const mark=()=>{
         panel.dataset.ux17OwnDirty='1';
@@ -163,13 +169,19 @@
     for(const row of root.querySelectorAll('#patientMedList > .patient-med-row')){
       const details=row.querySelector(':scope > .ux17-med-more');
       const id=row.querySelector('.patient-med-del')?.dataset.id;
-      if(!details||!id||details.querySelector('.ux17-edit-launcher'))continue;
+      if(!details||!id||row.querySelector('.ux17-edit-quick-action'))continue;
       const record=readRecord(id);if(!record)continue;
-      const launch=button('処方内容を設定・修正',()=>drawEditor(row,readRecord(id)));
+      const bar=control('div');
+      bar.className='ux17-edit-quick-action';
+      bar.style.cssText='display:flex;justify-content:flex-end;gap:7px;margin:5px 0 3px';
+      const launch=button('✏️ 規格・量・いつを修正',()=>{
+        const current=readRecord(id);
+        if(current)drawEditor(row,current);
+      });
       launch.classList.add('ux17-edit-launcher');
-      launch.style.marginTop='9px';
-      const editor=details.querySelector('.patient-med-editor');
-      if(editor)details.insertBefore(launch,editor);else details.append(launch);
+      launch.style.cssText='min-height:38px;padding:6px 11px;font-size:13px;line-height:1.35';
+      bar.appendChild(launch);
+      row.insertBefore(bar,details);
     }
   }
   const oldList=window.drawPatientMedicationList;
