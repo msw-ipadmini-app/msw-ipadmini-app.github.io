@@ -38,6 +38,7 @@ const ASSETS=[
   './ux16-journal-entry-scroll.js?v=ux16-20261118-v1',
   './ux17-patient-med-layout.js?v=ux17-20261118-v1',
   './ux17-medication-compact-list.js?v=ux17-20261118-v1',
+  './ux17-existing-medication-edit.js?v=ux17-20261118-v1',
   './ux17-generic-choices.js?v=ux17-20261118-v1',
   './ux17-selection-wizard.js?v=ux17-20261118-v1',
   './ux17-prescription-print.js?v=ux17-20261118-v1',
