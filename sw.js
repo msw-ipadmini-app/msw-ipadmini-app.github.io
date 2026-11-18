@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261118-ux16-journal-entry-scroll-v1';
+const CACHE=CACHE_PREFIX+'20261118-ux17-patient-medication-v1';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -36,6 +36,12 @@ const ASSETS=[
   './ux14-journal-scan-hide.js?v=ux14-20261113-v1',
   './ux15-discharge-doctor.js?v=ux15-20261118-v1',
   './ux16-journal-entry-scroll.js?v=ux16-20261118-v1',
+  './ux17-patient-med-layout.js?v=ux17-20261118-v1',
+  './ux17-medication-compact-list.js?v=ux17-20261118-v1',
+  './ux17-generic-choices.js?v=ux17-20261118-v1',
+  './ux17-selection-wizard.js?v=ux17-20261118-v1',
+  './ux17-prescription-print.js?v=ux17-20261118-v1',
+  './ux17-hide-reference-panel.css?v=ux17-20261118-v1',
   './ux10-fixed-tray-drag.css?v=ux11-longpress-20261111-v1',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
