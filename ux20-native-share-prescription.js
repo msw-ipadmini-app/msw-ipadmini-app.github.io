@@ -246,9 +246,11 @@
           throw new Error('PDFファイルの共有が利用できません。従来方式で印刷してください。');
         status.textContent='共有メニューの「プリント」を選んでください。';
         Promise.resolve(navigator.share(payload)).then(
-          ()=>{if(status.isConnected)status.textContent='共有操作が完了しました。処方薬画面へ戻れます。';},
-          e=>{if(status.isConnected)status.textContent=e?.name==='AbortError'?
-            '共有をキャンセルしました。': 'PDF共有に失敗：'+String(e?.name||'不明');}
+          ()=>{clearModal();},
+          e=>{
+            if(e?.name==='AbortError')clearModal();
+            else if(status.isConnected)status.textContent='PDF共有に失敗：'+String(e?.name||'不明');
+          }
         ).finally(()=>{
           busy=false;pendingFile=null;
           if(go.isConnected)go.disabled=false;
