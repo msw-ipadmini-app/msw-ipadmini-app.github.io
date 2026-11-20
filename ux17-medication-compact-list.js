@@ -1,4 +1,4 @@
-/* UX17 production: compact medication list with original delete action
+/* UX19 production: compact medication list with original delete action
  * and preserved details. Old medication records have no per-dose schedule;
  * never infer a time or change an existing prescription.
  */
@@ -37,6 +37,10 @@
     // Legacy records have no timing and must remain visibly "未設定".
     const identifier=row.querySelector('.patient-med-del')?.dataset.id;
     const stored=identifier?medRows(selectedPatient).find(r=>r.id===identifier):null;
+    const verified=window.UX19DoseSchedule?.resolve(stored);
+    if(verified)return ['合計'+verified.total+verified.unit+'/日',verified.description];
+    // A malformed or independently edited UX19 dose is NOT shown as valid.
+    if(stored?.ux19Schedule)return ['要確認','要確認'];
     const schedule=stored?.ux17Schedule;
     if(schedule&&typeof schedule==='object'&&
        /^\d{1,4}(?:\.\d{1,3})?$/.test(String(schedule.doseQuantity||''))&&

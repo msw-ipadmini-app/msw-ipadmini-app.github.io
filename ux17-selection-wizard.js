@@ -1,7 +1,6 @@
-/* UX17 PRODUCTION (2026-11-18).
- * Select an actual registered originator/generic brand, confirm, enter exact
- * strength/quantity/timing, then save as ONE encrypted patient transaction.
- * Existing prescriptions remain untouched; no automated substitutions.
+/* UX19 PRODUCTION: select registered named brand, immediately configure
+ * explicitly entered per-time-slot quantities or PRN, then require a
+ * confirmed encrypted save. Existing prescriptions are not auto-migrated.
  */
 (function(){
   'use strict';
@@ -14,6 +13,23 @@
     ['朝・夕食後',2],['毎食前',3],['毎食後',3],['就寝前',1],
     ['疼痛時',null],['その他',null]
   ];
+  // A brand may appear more than once when the *strength differs*.
+  // Never collapse 0.5mg and 1mg into one prescription entry.
+  // Unspecified legacy strengths are ambiguous, so require review first.
+  const keyPart=value=>String(value??'').trim().normalize('NFKC')
+    .replace(/[\s\u3000]+/g,'').toLocaleLowerCase('ja');
+  function prescriptionConflict(rows,incoming){
+    const name=keyPart(incoming?.drug?.['薬名']);
+    const strength=keyPart(incoming?.pricing?.strength);
+    if(!name||!strength)return 'invalid';
+    for(const old of rows){
+      if(keyPart(old?.drug?.['薬名'])!==name)continue;
+      const previousStrength=keyPart(old?.pricing?.strength);
+      if(!previousStrength)return 'unknown';
+      if(previousStrength===strength)return 'same';
+    }
+    return '';
+  }
   let submitting=false;
   const make=(tag,klass,text)=>{
     const node=document.createElement(tag);
@@ -47,38 +63,6 @@
     const p=make('p','notice ux17-wizard-'+kind,message);panel.appendChild(p);
     return p;
   }
-  function listStrengths(identity,resolved){
-    const master=state?.drugs?.[identity.index];
-    if(!master)return [];
-    let rows=null;
-    if(identity.kind==='generic')rows=master.rx037?.generics?.[identity.brandIndex]?.priceRows;
-    else if(identity.brandIndex===0)rows=master.rx037?.priceRows;
-    else rows=master.rx038?.otherOriginals?.[identity.brandIndex-1]?.priceRows;
-    const strengths=[];
-    if(Array.isArray(rows)){
-      for(const row of window.RX046?.sortedRows?.(rows)||rows){
-        const amount=String(row?.amount??'').trim().normalize('NFKC');
-        const unit=String(row?.unit??'').trim().normalize('NFKC');
-        const strength=amount+unit;
-        if(/^\d{1,6}(?:\.\d{1,3})?$/.test(amount)&&Number(amount)>0&&
-          unit.length>0&&unit.length<=15&&strength.length<=60&&!/[<>]/.test(unit)&&
-          !strengths.some(x=>x.strength===strength)){
-          strengths.push({strength});
-        }
-        if(strengths.length===20)break;
-      }
-    }
-    // Legacy price labels are also eligible only from the selected brand.
-    if(typeof medPriceChoices==='function'){
-      for(const entry of medPriceChoices(resolved.drug['薬価'])){
-        if(!strengths.some(x=>x.strength===entry.strength)){
-          strengths.push({strength:entry.strength});
-        }
-        if(strengths.length===20)break;
-      }
-    }
-    return strengths;
-  }
   function wizardHost(){
     const host=document.querySelector('#tabbody #patientDrugResults');
     return host?.closest('section.panel')||null;
@@ -92,9 +76,25 @@
     if(!container)return null;
     const panel=make('section','ux17-wizard','');
     panel.id='ux17Wizard';
-    panel.style.cssText='border:2px solid #4f8d88;border-radius:12px;padding:12px;margin:12px 0;background:#f7fbfa';
-    container.appendChild(panel);
+    panel.setAttribute('tabindex','-1');
+    panel.style.cssText='border:2px solid #4f8d88;border-radius:12px;padding:12px;margin:12px 0;background:#f7fbfa;scroll-margin-top:12px';
+    // Insert ABOVE search results, instead of after them where iPad mini
+    // users may not see the editor after tapping a master search candidate.
+    const results=document.querySelector('#tabbody #patientDrugResults');
+    if(results?.parentElement===container)container.insertBefore(panel,results);
+    else container.appendChild(panel);
     return panel;
+  }
+  function revealFrame(panel){
+    if(!panel)return;
+    const reveal=()=>{
+      if(document.querySelector('#tabbody #ux17Wizard')!==panel)return;
+      try{panel.scrollIntoView({block:'start',behavior:'auto'});}catch(_){}
+      try{panel.focus({preventScroll:true});}catch(_){}
+    };
+    // Run immediately and again after layout; Safari can be mid-scroll.
+    reveal();
+    if(typeof requestAnimationFrame==='function')requestAnimationFrame(reveal);
   }
   function begin(identity){
     const resolved=window.RX045.resolve(state?.drugs||[],identity);
@@ -103,92 +103,83 @@
     }
     const patient=selectedPatient;
     const panel=renderFrame();if(!panel)return;
-    panel.append(make('h4','','② 選択した薬剤を確認'));
-    panel.append(make('strong','',resolved.drug['薬名']));
-    info(panel,'notice',resolved.label+' ／ '+(resolved.drug['医薬品分類']||'分類未設定'));
-    info(panel,'safety','実際に服用している銘柄名と一致しているか、処方箋・電子カルテで確認してください。別の銘柄への代替を判定するものではありません。');
-    const controls=make('div');controls.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
-    controls.append(
-      action('戻る',clearWizard),
-      action('この薬剤名で進む',()=>configure(panel,resolved,identity,patient),'')
-    );panel.append(controls);
+    configure(panel,resolved,identity,patient);
+    revealFrame(panel);
   }
 
   function configure(panel,resolved,identity,patient){
-    panel.replaceChildren(make('h4','','③ 規格・量・いつを設定'));
+    panel.replaceChildren(make('h4','','② 規格・数量・用法を設定'));
     info(panel,'notice','選択した薬剤：'+resolved.drug['薬名']+'（'+resolved.label+'）');
+    info(panel,'safety','選択した銘柄名を電子カルテと照合してください。規格は手入力です。');
     const form=make('div','ux17-wizard-inputs');
     form.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin:10px 0';
-    const choices=listStrengths(identity,resolved);
-    const strengthSelect=select([
-      ['','規格を選択'],
-      ...choices.map(c=>[c.strength,c.strength]),
-      ['__manual__','規格を手入力']
-    ]);
-    field(form,'規格（mgなど）',strengthSelect);
-    const strengthManual=input('text','例：5mg',60);
-    strengthManual.style.display='none';
-    strengthSelect.onchange=()=>{
-      strengthManual.style.display=strengthSelect.value==='__manual__'?'block':'none';
-    };
-    field(form,'手入力の規格',strengthManual);
-    const qty=input('text','例：1、0.5',12);qty.inputMode='decimal';
-    field(form,'1回の服用量',qty);
+    const strengthManual=input('text','例：10mg',60);
+    field(form,'規格（手入力）',strengthManual);
     const unitSelect=select([
       ['','単位を選択'],
-      ...['錠','カプセル','包','g','mL','本','枚','回','その他'].map(s=>[s,s])
+      ...['錠','カプセル','包','g','mL','本','枚','回','その他'].map(x=>[x,x])
     ]);
-    field(form,'服用量の単位',unitSelect);
+    field(form,'数量の単位',unitSelect);
+    const timeEditor=window.UX19DoseSchedule.buildEditor(null,()=>unitSelect.value);
+    const prnForm=make('div','ux19-prn-fields');
+    prnForm.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:10px;margin:8px 0';
+    const qty=input('text','例：1、0.5',12);qty.inputMode='decimal';
+    field(prnForm,'頓服の1回量',qty);
     const timeSelect=select([
-      ['','飲むタイミングを選択'],
-      ...TIME.map(([label])=>[label,label])
+      ['','服用する条件を選択'],
+      ...TIME.map(([name])=>[name,name])
     ]);
-    field(form,'いつ飲む',timeSelect);
-    const timeManual=input('text','例：月・木の朝',50);
-    timeManual.style.display='none';
-    timeSelect.onchange=()=>{
-      timeManual.style.display=timeSelect.value==='その他'?'block':'none';
+    field(prnForm,'頓服の用法',timeSelect);
+    const timeManual=input('text','例：発熱時、月・木の朝',50);
+    field(prnForm,'その他の服用条件',timeManual);
+    panel.append(form,timeEditor.panel,prnForm);
+    const syncMode=prn=>{
+      prnForm.style.display=prn?'grid':'none';
+      timeManual.parentElement.style.display=prn&&timeSelect.value==='その他'?'flex':'none';
     };
-    field(form,'その他のタイミング',timeManual);
-    const statusSelect=select([['','区分を選択'],['定期','定期薬'],['頓服','頓服薬']]);
-    field(form,'服用区分',statusSelect);
-    panel.append(form);
+    timeEditor.onModeChange(syncMode);
+    unitSelect.addEventListener('change',timeEditor.refresh);
+    timeSelect.addEventListener('change',()=>syncMode(timeEditor.isPRN()));
     info(panel,'safety','薬価は自動設定しません。定期薬の参考日額は、単価を別途確認・保存してから計算します。');
     const message=info(panel,'status','');
     message.setAttribute('role','status');
     const buttons=make('div');buttons.style.cssText='display:flex;gap:8px;flex-wrap:wrap';
     buttons.append(
-      action('薬剤名に戻る',()=>begin(identity)),
+      action('薬剤選択に戻る',clearWizard),
       action('確認して一覧に登録',async()=>{
         if(submitting)return;
-        const strength=(strengthSelect.value==='__manual__'?strengthManual.value:strengthSelect.value).trim().normalize('NFKC');
+        const strength=strengthManual.value.trim().normalize('NFKC');
         const qtyText=qty.value.trim().normalize('NFKC');
         const unit=unitSelect.value;
-        const mode=statusSelect.value;
+        const mode=timeEditor.isPRN()?'頓服':'定期';
         const time=timeSelect.value==='その他'?timeManual.value.trim():timeSelect.value;
-        if(!strength||strength.length>60||!qtyText||!unit||!time||!mode||
-           time.length>50||! /^\d{1,4}(?:\.\d{1,3})?$/.test(qtyText)||
-           Number(qtyText)<=0||Number(qtyText)>1000){
-          message.textContent='規格・1回量・単位・服用タイミング・区分を正しく入力してください。';
-          return;
+        if(!strength||strength.length>60||!unit||!mode){
+          message.textContent='規格と数量の単位を入力してください。';return;
         }
-        if(time==='疼痛時'&&mode!=='頓服'){
-          message.textContent='「疼痛時」は頓服として登録してください。';return;
+        const structured=mode==='定期'?timeEditor.read(strength,unit,mode):null;
+        if(structured?.error){message.textContent=structured.error;return;}
+        if(mode==='頓服'&&(
+           !/^\d{1,4}(?:\.\d{1,3})?$/.test(qtyText)||
+           Number(qtyText)<=0||Number(qtyText)>1000||
+           !time||time.length>50)){
+          message.textContent='頓服の1回量・単位・用法を確認してください。';return;
         }
-        const count=TIME.find(([name])=>name===time)?.[1]??null;
-        const daily=mode==='定期'&&count!==null
-          ?String(Math.round(Number(qtyText)*count*1000)/1000):'';
-        if(daily&&Number(daily)>1000){
-          message.textContent='1日の合計数量が上限を超えます。';return;
+        if(mode!=='定期'&&mode!=='頓服'){
+          message.textContent='定期薬か頓服薬か選択してください。';return;
         }
+        const daily=structured?.schedule?.dailyQuantity||'';
         const record={
           id:typeof uid==='function'?uid():String(Date.now()),
           drug:resolved.drug,
           addedAt:typeof nowISO==='function'?nowISO():new Date().toISOString(),
           ...(resolved.origin?{rx045Origin:resolved.origin}:{}),
           pricing:{strength,unitPrice:'',unit,dailyQuantity:daily,status:mode},
-          ux17Schedule:{doseQuantity:qtyText,doseUnit:unit,timing:time,status:mode,strength}
+          ux17Schedule:mode==='頓服'?{strength,doseQuantity:qtyText,doseUnit:unit,timing:time,status:mode}:null,
+          ...(structured?.schedule?{ux19Schedule:structured.schedule}:{})
         };
+        const description=mode==='定期'
+          ?'数量'+daily+unit+'／'+window.UX19DoseSchedule.resolve(record).description
+          :'1回'+qtyText+unit+'／'+time;
         if(patient!==selectedPatient||!key||!state||!patient||patient._new){
           message.textContent='患者とロック状態を確認してください。新規患者は基本情報を先に保存してください。';return;
         }
@@ -197,11 +188,15 @@
         }
         const prev=medRows(patient).slice();
         if(prev.length>=100){message.textContent='一人の患者には100件まで登録できます。';return;}
-        if(prev.some(r=>medSignature(r?.drug)===medSignature(record.drug))){
-          message.textContent='同じ薬剤はすでに登録されています。';return;
+        const conflict=prescriptionConflict(prev,record);
+        if(conflict){
+          message.textContent=conflict==='unknown'
+            ?'同じ薬剤名の既存薬で規格が未設定です。既存薬の規格を確認してから追加してください。'
+            :'同じ薬剤名・同じ規格はすでに登録されています。既存薬の修正をご利用ください。';
+          return;
         }
-        if(!confirm('「'+record.drug['薬名']+'」 '+strength+' ／ 1回'+qtyText+unit+
-          ' ／ '+time+' ／ '+mode+' を患者の一覧に登録しますか？\n処方内容と一致することを確認してください。'))return;
+        if(!confirm('「'+record.drug['薬名']+'」 '+strength+' ／ '+description+
+          ' ／ '+mode+' を患者の一覧に登録しますか？\n処方内容と一致することを確認してください。'))return;
         if(patientMedicationBusy){message.textContent='別の薬剤の保存中です。完了後に操作してください。';return;}
         submitting=true;
         patientMedicationBusy=true;
@@ -213,7 +208,7 @@
           if(patient===selectedPatient){
             drawPatientMedicationList();
             panel.replaceChildren(make('h4','','④ 登録完了'));
-            info(panel,'success','選択した薬剤と規格・量・タイミングを保存しました。');
+            info(panel,'success','選択した薬剤と数量・用法を保存しました。');
             panel.append(action('閉じる',clearWizard));
           }
         }catch(err){
@@ -230,7 +225,11 @@
   // Intercept existing RX045/UX17 candidate actions before old handlers run.
   // Existing search rendering, search input and master database are untouched.
   document.addEventListener('click',event=>{
-    const btn=event.target?.closest?.('button.rx045Choose, .ux17-generic-candidate button[data-ux17-kind]');
+    // In addition to the button, accept tapping the candidate name/card.
+    // Only use a genuine search result with explicit master brand identity.
+    const row=event.target?.closest?.('.rx045Candidate, .ux17-generic-candidate');
+    const btn=event.target?.closest?.('button.rx045Choose, .ux17-generic-candidate button[data-ux17-kind]')||
+      row?.querySelector('button.rx045Choose, button[data-ux17-kind]');
     if(!btn||btn.disabled||!document.querySelector('#tabbody')?.contains(btn))return;
     if(!document.querySelector('#tabbody .patient-med-page'))return;
     const raw=btn.classList.contains('rx045Choose')
