@@ -1,4 +1,4 @@
-/* UX17-FIX01 production: visible per-row edit of dose/timing for an EXISTING drug.
+/* UX19 PRODUCTION: visible per-row edit of dose/timing for an EXISTING drug.
  * Preserves medication id, named brand snapshot, notes, original selected
  * product, attached RX035 reference, and historical metadata.
  * Atomic encrypted save with rollback; no mutation of drug master.
@@ -56,21 +56,34 @@
     const panel=control('div');
     panel.className='ux17-existing-edit';
     panel.style.cssText='padding:10px;border:1px solid #91bdb5;border-radius:9px;margin:8px 0;background:#f5fbfa';
-    panel.append(control('strong','処方内容（規格・1回量・いつ）を設定／修正'));
+    panel.append(control('strong','処方内容（規格・数量・用法）を設定／修正'));
     const cols=control('div');
     cols.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:10px 0';
 
-    const strength=field(cols,'規格',txt(pricing.strength,60,'例：5mg'));
-    const qty=field(cols,'1回の服用量',txt(schedule.doseQuantity,12,'例：1、0.5'));
+    const strength=field(cols,'規格（手入力）',txt(pricing.strength,60,'例：10mg'));
+    const unit=field(cols,'数量の単位',pick([['','選択してください'],...units.map(x=>[x,x])],schedule.doseUnit||pricing.unit));
+    const timeEditor=window.UX19DoseSchedule.buildEditor(
+      record.ux19Schedule,()=>unit.value,pricing.status==='頓服'||schedule.status==='頓服');
+    const prnCols=control('div');
+    prnCols.style.cssText='display:grid;grid-template-columns:repeat(auto-fit,minmax(135px,1fr));gap:10px;margin:10px 0';
+    const qty=field(prnCols,'頓服の1回量',txt(schedule.doseQuantity,12,'例：1、0.5'));
     qty.inputMode='decimal';
-    const unit=field(cols,'単位',pick([['','選択してください'],...units.map(x=>[x,x])],schedule.doseUnit||pricing.unit));
-    const mode=field(cols,'区分',pick([['','選択してください'],['定期','定期薬'],['頓服','頓服薬']],schedule.status||(['定期','頓服'].includes(pricing.status)?pricing.status:'')));
     const knownTime=times.some(([value])=>value===schedule.timing);
-    const timing=field(cols,'いつ',pick([['','選択してください'],...times.map(([v])=>[v,v])],knownTime?schedule.timing:schedule.timing?'その他':''));
-    const other=field(cols,'その他の服用時点',txt(knownTime?'':schedule.timing,50,'例：月・木の朝'));
-    other.parentElement.style.display=timing.value==='その他'?'flex':'none';
-    timing.onchange=()=>{other.parentElement.style.display=timing.value==='その他'?'flex':'none';};
-    panel.append(cols);
+    const timing=field(prnCols,'頓服の用法',
+      pick([['','選択してください'],...times.map(([v])=>[v,v])],
+        knownTime?schedule.timing:schedule.timing?'その他':''));
+    const other=field(prnCols,'その他の服用条件',txt(knownTime?'':schedule.timing,50,'例：発熱時'));
+    panel.append(cols,timeEditor.panel,prnCols);
+    const legacyLabel=control('p','従来の「1回量・毎食後」から時間帯別の数量は推測しません。電子カルテと照合して入力してください。');
+    legacyLabel.className='notice';
+    if(!record.ux19Schedule&&pricing.status==='定期')panel.append(legacyLabel);
+    const syncMode=prn=>{
+      prnCols.style.display=prn?'grid':'none';
+      other.parentElement.style.display=prn&&timing.value==='その他'?'flex':'none';
+    };
+    timeEditor.onModeChange(syncMode);
+    timing.addEventListener('change',()=>syncMode(timeEditor.isPRN()));
+    unit.addEventListener('change',timeEditor.refresh);
     const notice=control('p','規格・服用内容を実際の処方と照合して保存します。規格・単位を変更した場合、以前の参考単価はクリアします。');
     notice.className='notice';panel.append(notice);
     const message=control('p');message.className='notice';message.setAttribute('role','status');panel.append(message);
@@ -93,21 +106,26 @@
       const current=readRecord(id);
       if(!current){message.textContent='該当する薬剤が見つかりません。';return;}
       const st=strength.value.trim().normalize('NFKC'),q=qty.value.trim().normalize('NFKC');
-      const u=unit.value,when=timing.value==='その他'?other.value.trim():timing.value,m=mode.value;
-      if(!st||st.length>60||!/^\d{1,4}(?:\.\d{1,3})?$/.test(q)||Number(q)<=0||
-        Number(q)>1000||!units.includes(u)||!when||when.length>50||
-        !['定期','頓服'].includes(m)||(when==='疼痛時'&&m!=='頓服')){
-        message.textContent='規格・1回量・単位・タイミング・区分を正しく入力してください。';
-        return;
+      const u=unit.value,when=timing.value==='その他'?other.value.trim():timing.value,m=timeEditor.isPRN()?'頓服':'定期';
+      if(!st||st.length>60||!units.includes(u)||!['定期','頓服'].includes(m)){
+        message.textContent='規格と数量の単位を確認してください。';return;
       }
-      const timesPerDay=times.find(([v])=>v===when)?.[1]??null;
-      const daily=m==='定期'&&timesPerDay!==null
-        ?String(Math.round(Number(q)*timesPerDay*1000)/1000):'';
-      if(daily&&Number(daily)>1000){
-        message.textContent='1日の合計数量を確認してください。';return;
+      const structured=m==='定期'?timeEditor.read(st,u,m):null;
+      if(structured?.error){message.textContent=structured.error;return;}
+      if(m==='頓服'&&(
+         !/^\d{1,4}(?:\.\d{1,3})?$/.test(q)||Number(q)<=0||Number(q)>1000||
+         !when||when.length>50)){
+        message.textContent='頓服の1回量・服用時点を確認してください。';return;
       }
+      const daily=structured?.schedule?.dailyQuantity||'';
+      const next19=structured?.schedule||null;
+      const next17=m==='頓服'?{strength:st,doseQuantity:q,doseUnit:u,timing:when,status:m}:null;
+      const checkRow={pricing:{strength:st,unit:u,status:m,dailyQuantity:daily},ux19Schedule:next19};
+      const description=m==='定期'
+        ?'数量'+daily+u+'／'+window.UX19DoseSchedule.resolve(checkRow).description
+        :'1回'+q+u+'／'+when;
       if(!confirm('「'+String(current.drug?.['薬名']||'薬剤')+'」の処方内容を'+
-        '\n'+st+'／1回'+q+u+'／'+when+'／'+m+' に設定します。'+
+        '\n'+st+'／'+description+'／'+m+' に設定します。'+
         '\n電子カルテ等の現在の処方と一致していますか？'))return;
       const oldPricing=current.pricing||{};
       const priceUnchanged=String(oldPricing.strength||'')===st&&String(oldPricing.unit||'')===u;
@@ -115,12 +133,11 @@
         ...oldPricing,strength:st,unit:u,status:m,dailyQuantity:daily,
         unitPrice:priceUnchanged?String(oldPricing.unitPrice||''):''
       };
-      const nextSchedule={strength:st,doseQuantity:q,doseUnit:u,timing:when,status:m};
       const before=patient.medications.slice();
       patientMedicationBusy=true;
       message.textContent='暗号化保存しています…';
       patient.medications=before.map(x=>x.id===id?{
-        ...x,pricing:nextPricing,ux17Schedule:nextSchedule
+        ...x,pricing:nextPricing,ux17Schedule:next17,ux19Schedule:next19
       }:x);
       try{
         if(selectedPatient!==patient||!key||!state)throw Error('患者またはロック状態が変わりました。');
@@ -174,7 +191,7 @@
       const bar=control('div');
       bar.className='ux17-edit-quick-action';
       bar.style.cssText='display:flex;justify-content:flex-end;gap:7px;margin:5px 0 3px';
-      const launch=button('✏️ 規格・量・いつを修正',()=>{
+      const launch=button('✏️ 数量・用法を修正',()=>{
         const current=readRecord(id);
         if(current)drawEditor(row,current);
       });
