@@ -4,10 +4,10 @@
  */
 (function(){
   'use strict';
-  if(window.__MSW_UX20_INLINE_PRINT_TEST__)return;
+  if(window.__MSW_UX20_INLINE_PRINT__)return;
   const api=window.UX17PrescriptionPrintCheck;
   if(!api?.readPatientRows||!api?.printHTML||typeof window.renderPatientMedications!=='function')return;
-  window.__MSW_UX20_INLINE_PRINT_TEST__=true;
+  window.__MSW_UX20_INLINE_PRINT__=true;
   let preview=null,observer=null;
   function closePreview(){
     if(observer){observer.disconnect();observer=null;}
@@ -106,12 +106,12 @@
     if(!data.total){alert('処方薬が登録されていません。');return;}
     if(data.incomplete){
       alert('数量・用法が未確認（旧形式を含む）の薬剤が'+data.incomplete+'件あります。'+
-        '\\n印刷前に登録内容を確認・入力してください。未確認の処方薬を省略して印刷しないよう、今回は中止します。');
+        '\n印刷前に登録内容を確認・入力してください。未確認の処方薬を省略して印刷しないよう、今回は中止します。');
       return;
     }
     if(!data.entries.length){alert('印刷できる現在の処方薬がありません。');return;}
     if(!confirm('電子カルテの最新の内服処方と、変更・中止・頓服をすべて照合しましたか？'+
-      '\\n一致を確認した場合のみ、情報提供用A4を印刷します。薬価は掲載しません。'))return;
+      '\n一致を確認した場合のみ、情報提供用A4を印刷します。薬価は掲載しません。'))return;
     const name=String(patient.data?.['氏名']||'未記入').trim();
     const id=String(patient.data?.['ＩＤ']||'');
     displayInline(data.entries,name,id);
