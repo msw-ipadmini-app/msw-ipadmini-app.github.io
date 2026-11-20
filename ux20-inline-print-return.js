@@ -61,6 +61,28 @@
       }`;
     document.head.appendChild(css);
   }
+  // Use the previously verified UX19 printing pathway in a separate tab.
+  // Do not bypass background lock: returning may require PIN again.
+  function openProvenPrint(rows,name,id){
+    const tab=window.open('','_blank');
+    if(!tab){
+      alert('印刷用の画面を開けませんでした。Safariのポップアップ設定をご確認ください。');
+      return;
+    }
+    try{
+      tab.document.open();
+      tab.document.write(api.printHTML(rows,name,id));
+      tab.document.close();
+      // Safari may skip auto-print; keep the explicit print button as a fallback.
+      tab.document.getElementById('ux17PrintNow')?.addEventListener('click',()=>tab.print());
+      tab.document.getElementById('ux17PrintClose')?.addEventListener('click',()=>tab.close());
+      tab.focus();
+      tab.setTimeout(()=>tab.print(),240);
+    }catch(e){
+      try{tab.close();}catch(_){}
+      alert('印刷画面の表示に失敗しました。');
+    }
+  }
   function displayInline(rows,name,id){
     closePreview();
     addStyle();
@@ -77,9 +99,14 @@
       btn.textContent=text;btn.addEventListener('click',click);return btn;
     }
     toolbar.append(
-      button('A4で印刷',()=>window.print()),
+      button('A4で印刷（従来方式）',()=>openProvenPrint(rows,name,id)),
       button('← 処方薬画面に戻る',closePreview)
     );
+    const note=document.createElement('p');
+    note.className='notice';
+    note.textContent='印刷は別タブで開きます。安全のため、戻る際に暗証番号の入力が必要になる場合があります。';
+    note.style.cssText='margin:0 0 10px;font-size:12px;line-height:1.5;color:#334155';
+    toolbar.append(note);
     const sheet=document.createElement('div');sheet.className='ux20-sheet';
     // Build from the same validated/safely escaped A4 document.
     for(const selector of ['h1','.meta','.note','table']){
