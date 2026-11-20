@@ -1,4 +1,4 @@
-/* UX17 PRODUCTION A4 information sheet.
+/* UX19 PRODUCTION A4 information sheet.
  * Prints only explicitly verified named drug, strength, quantity and timing,
  * never the drug price or reference price. Requires current prescription
  * reconciliation confirmation and blocks incomplete/stale entries.
@@ -26,22 +26,26 @@
   // Print ONLY the explicit prescribed fields from UX17. Never print master
   // drug effect, generic list, reference pricing, unit price or totals.
   function printableRow(record){
-    const dose=record?.ux17Schedule,pricing=record?.pricing||{};
+    const pricing=record?.pricing||{};
     const name=text(record?.drug?.['薬名']);
     const strength=text(pricing.strength);
+    if(!name||name.length>180||!strength||strength.length>60)return null;
+    if(pricing.status==='定期'){
+      // Old UX17 one-dose records cannot safely become a daily breakdown.
+      const verified=window.UX19DoseSchedule?.resolve(record);
+      if(!verified)return null;
+      return {name,strength,dose:verified.total+verified.unit+'／日',
+        when:verified.description,status:'定期'};
+    }
+    const dose=record?.ux17Schedule;
     const quantity=text(dose?.doseQuantity);
     const unit=text(dose?.doseUnit);
     const when=text(dose?.timing);
-    const status=text(dose?.status||pricing.status);
-    if(!name||name.length>180||!strength||strength.length>60||
-       !dose||!qtyOK(quantity)||!allowedUnits.has(unit)||
-       !when||when.length>50||!statuses.has(status)||dose.status!==status||
+    if(pricing.status!=='頓服'||!dose||dose.status!=='頓服'||
        String(dose.strength||'')!==String(pricing.strength||'')||
        String(dose.doseUnit||'')!==String(pricing.unit||'')||
-       String(dose.status||'')!==String(pricing.status||'')){
-      return null;
-    }
-    return {name,strength,dose:'1回'+quantity+unit,when,status};
+       !qtyOK(quantity)||!allowedUnits.has(unit)||!when||when.length>50)return null;
+    return {name,strength,dose:'1回'+quantity+unit,when,status:'頓服'};
   }
   function readPatientRows(patient){
     const all=medRows(patient);
@@ -64,8 +68,7 @@
       '<td class="drug">'+safe(item.name)+'</td>'+
       '<td>'+safe(item.strength)+'</td>'+
       '<td>'+safe(item.dose)+'</td>'+
-      '<td>'+safe(item.when)+'</td>'+
-      '<td>'+safe(item.status)+'</td></tr>').join('');
+      '<td>'+safe(item.when)+'</td></tr>').join('');
     return '<!doctype html><html lang="ja"><head><meta charset="utf-8">'+
       '<meta name="viewport" content="width=device-width, initial-scale=1">'+
       '<title>現在の内服処方一覧（情報提供用）</title>'+
@@ -82,8 +85,7 @@
       'th,td{border:1px solid #555;padding:7px 5px;text-align:left;vertical-align:top;overflow-wrap:anywhere}'+
       'th{background:#eee;font-size:9pt}td{font-size:10pt}'+
       'tr{break-inside:avoid;page-break-inside:avoid}'+
-      '.num{width:5%;text-align:center}.drug{width:28%}'+
-      '.footer{border-top:1px solid #999;margin-top:6mm;padding-top:3mm;font-size:9pt}'+
+      '.num{width:5%;text-align:center}.drug{width:29%}'+
       '.controls{margin:0 0 18px;display:flex;gap:8px}'+
       '.controls button{background:#0f766e;color:white;font-size:16px;padding:10px 18px;border:0;border-radius:8px}'+
       '@media print{body{padding:0}.controls{display:none!important}th{-webkit-print-color-adjust:exact;print-color-adjust:exact}}'+
@@ -97,11 +99,9 @@
       '<p><strong>薬剤数：</strong>'+rows.length+'剤</p></div>'+
       '<p class="note">電子カルテの最新処方と照合済みの情報のみ、情報提供用として使用してください。</p>'+
       '<table><colgroup><col style="width:5%"><col style="width:29%"><col style="width:14%">'+
-      '<col style="width:16%"><col style="width:24%"><col style="width:12%"></colgroup>'+
-      '<thead><tr><th>No.</th><th>薬剤名</th><th>規格</th><th>1回量</th><th>服用時点</th><th>区分</th></tr></thead>'+
+      '<col style="width:15%"><col style="width:37%"></colgroup>'+
+      '<thead><tr><th>No.</th><th>薬剤名</th><th>規格</th><th>数量</th><th>用法</th></tr></thead>'+
       '<tbody>'+output+'</tbody></table>'+
-      '<p class="footer">※正式な処方箋ではありません。薬剤の中止・変更・頓服の状況も、最新の電子カルテ等で確認してください。'+
-      '</p>'+
       '</body></html>';
   }
   function openPrint(rows,name,id,autoPrint){
@@ -134,7 +134,7 @@
     const data=readPatientRows(patient);
     if(!data.total){alert('処方薬が登録されていません。');return;}
     if(data.incomplete){
-      alert('規格・1回量・服用時点などが未設定の薬剤が'+data.incomplete+'件あります。'+
+      alert('数量・用法が未確認（旧形式を含む）の薬剤が'+data.incomplete+'件あります。'+
         '\n印刷前に登録内容を確認・入力してください。未確認の処方薬を省略して印刷しないよう、今回は中止します。');
       return;
     }
@@ -162,7 +162,7 @@
     toolbar.append(make('A4情報提供用 印刷',printCurrent));
     const hint=document.createElement('p');
     hint.className='notice';
-    hint.textContent='薬価は印刷しません。規格・1回量・服用時点の未確認があれば印刷を停止します。電子カルテの最新処方と照合後に印刷してください。';
+    hint.textContent='薬価は印刷しません。数量・用法の未確認があれば印刷を停止します。電子カルテの最新処方と照合後に印刷してください。';
     const after=target.querySelector('h4');
     if(after){
       after.after(toolbar);
