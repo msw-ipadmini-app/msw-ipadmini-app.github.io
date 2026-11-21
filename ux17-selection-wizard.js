@@ -70,6 +70,20 @@
   function clearWizard(){
     document.querySelector('#tabbody #ux17Wizard')?.remove();
   }
+  // UI only: clear the previous master search after an encrypted prescription
+  // has been successfully saved. Failed/cancelled saves preserve the query.
+  function clearSearchAfterSavedPrescription(){
+    const search=document.querySelector('#tabbody .patient-med-page #patientDrugQuery');
+    if(!search)return;
+    search.value='';
+    try{
+      if(typeof drawPatientDrugResults==='function')drawPatientDrugResults();
+    }catch(_){
+      // A search rendering failure must not be mistaken for a failed save.
+      const results=document.querySelector('#tabbody #patientDrugResults');
+      if(results)results.replaceChildren();
+    }
+  }
   function renderFrame(){
     clearWizard();
     const container=wizardHost();
@@ -207,6 +221,7 @@
           await save();
           if(patient===selectedPatient){
             drawPatientMedicationList();
+            clearSearchAfterSavedPrescription();
             panel.replaceChildren(make('h4','','④ 登録完了'));
             info(panel,'success','選択した薬剤と数量・用法を保存しました。');
             panel.append(action('閉じる',clearWizard));
