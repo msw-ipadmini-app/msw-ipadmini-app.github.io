@@ -2834,7 +2834,7 @@ function startDischargeFlow(p=selectedPatient){
    const b=$('#dischargeCommit');b.disabled=true;
    if(selectedPatient===p&&!await flushPatientAutoSave()){b.disabled=false;alert('患者情報の自動保存に失敗しました。退院処理を中止しました。');return;}
    const old={date:p.dischargeDate,pending:p.summaryPending,bed:p.data['ベッド番号'],former:p.formerBed};
-   try{p.formerBed=previousBed;p.dischargeDate=date;p.summaryPending=true;p.data['ベッド番号']='';p.updatedAt=nowISO();await save();root.remove();$('#duplicateModal')?.remove();const hadPatientSheet=selectedPatient===p;if(hadPatientSheet)closePatient();if(fromPatientList){screen='patients';if(!hadPatientSheet)render()}else{screen='journal';render()}}
+   try{p.formerBed=previousBed;p.dischargeDate=date;p.summaryPending=true;p.data['ベッド番号']='';p.updatedAt=nowISO();await save();if(fromPatientList){patientListSearchQuery='';const search=$('#q');if(search)search.value='';}root.remove();$('#duplicateModal')?.remove();const hadPatientSheet=selectedPatient===p;if(hadPatientSheet)closePatient();if(fromPatientList){screen='patients';if(!hadPatientSheet)render()}else{screen='journal';render()}}
    catch(e){p.dischargeDate=old.date;p.summaryPending=old.pending;p.data['ベッド番号']=old.bed;p.formerBed=old.former;alert('保存できませんでした：'+e.message);b.disabled=false}
   };
  };
