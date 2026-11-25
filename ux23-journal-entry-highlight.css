@@ -1,0 +1,19 @@
+/* UX23 visual-only enhancement: manual new-patient entry in Journal.
+ * Styles only .journal-entry, leaving form controls, scroll behavior and data untouched.
+ */
+#main .journal-entry {
+  background: #fff1d6;
+  border: 2px solid #dda448;
+  box-shadow: 0 1px 5px rgba(121, 79, 17, .10);
+}
+#main .journal-entry > h3 {
+  color: #674412;
+}
+
+/* Hide only the Journal's provisional reading field from sight.
+ * Keep its DOM input so existing KANA06 candidate handling and
+ * unconfirmed Basic-tab review continue unchanged.
+ * Other field heights and sizes are untouched. */
+#main .journal-entry-fields > label:has(> #journalNewKana) {
+  display: none;
+}
