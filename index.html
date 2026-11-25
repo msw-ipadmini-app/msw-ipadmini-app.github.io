@@ -18,6 +18,8 @@
 <link rel="stylesheet" href="ux17-hide-reference-panel.css?v=ux17-20261118-v1" />
 <!-- UX21: screen-only viewport containment; print and data code unchanged. -->
 <link rel="stylesheet" href="ux21-screen-viewport.css?v=ux21-20261121-v1" />
+<!-- UX23: styling only for the Journal new-patient entry area. -->
+<link rel="stylesheet" href="ux23-journal-entry-highlight.css?v=ux23-20261125-v1" />
 </head>
 <body>
 <div id="app"><p style="padding:24px;color:#b91c1c;font-weight:600">実務試用版を読み込み中です。表示が進まない場合は通信状態とアプリ更新を確認してください。患者データの取り込み前に最新版表示と在院患者数を確認してください。</p></div>
@@ -66,5 +68,7 @@
 <script src="ux21-orientation-guard.js?v=ux21-20261121-v1"></script>
 <!-- RX050: add optional master review navigation after drug search and wizard. -->
 <script src="rx050-master-link.js?v=rx050-20261121-v1"></script>
+<!-- UX23: remove only obsolete prescription-print toolbar buttons after direct AirPrint binding. -->
+<script src="ux23-print-cleanup.js?v=ux23-20261125-v1"></script>
 </body>
 </html>
