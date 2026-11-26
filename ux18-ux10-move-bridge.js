@@ -89,10 +89,10 @@ function highlight(next){
  hover?.node?.classList.remove('ux10-drop-hover');
  hover=next;hover?.node?.classList.add('ux10-drop-hover');
 }
-/* UX11: native scrolling wins until an unmoving 600 ms long press.
+/* UX11: native scrolling wins until an unmoving 300 ms long press.
  * Touch events are intentionally passive on start; preventDefault is used
  * only after the long-press has fired, never during normal scrolling. */
-const HOLD_MS=600, MOVE_CANCEL_PX=12;
+const HOLD_MS=300, MOVE_CANCEL_PX=12;
 function bindLongPress(node,id,fromTray=false){
  if(node.dataset.ux11Ready==='1')return;
  node.dataset.ux11Ready='1';node.dataset.ux11Id=id;
