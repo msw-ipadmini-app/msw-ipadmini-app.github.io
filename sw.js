@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261127-ux27-paused-data-protect-v1';
+const CACHE=CACHE_PREFIX+'20261127-ux27-failopen-v2';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -54,6 +54,9 @@ const ASSETS=[
   './ux21-orientation-guard.js?v=ux21-20261121-v1',
   './ux17-hide-reference-panel.css?v=ux17-20261118-v1',
   './ux10-fixed-tray-drag.css?v=ux11-longpress-20261111-v1',
+  './ux27-integration.css?v=ux27-failopen-20261127-v2',
+  './ux27-host.js?v=ux27-failopen-20261127-v2',
+  './ux27-integration.js?v=ux27-failopen-20261127-v2',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
