@@ -318,19 +318,33 @@ async function unlock(){
     catch(_){return renderLock('認証試行の保存に失敗したため、ロックを解除できません。')}
     return renderLock(locked?'暗証の入力を15分間制限します。':'暗証が違います。');
   }
-  // Separate authentication errors from storage errors. Never misreport a
-  // failed patient-index read or write as an incorrect PIN.
+  // Diagnostic only: identify the failing phase without showing any
+  // patient data, PIN, error message, file contents or record counts.
+  // Keep all authentication, save and navigation behavior unchanged.
+  let unlockPhase='取得';
   try{
     const blob=await idbGet('data');
     if(!blob)throw new Error('暗号化患者データが存在しません');
+    unlockPhase='復号';
     state=await decryptObj(blob);
+    unlockPhase='形式確認';
     if(!state||!Array.isArray(state.patients))throw new Error('患者データの形式が不正です');
+    unlockPhase='認証記録更新';
     const cleared={...meta,failedAttempts:0,lockUntil:0};
     await idbSet('meta',cleared);meta=cleared;
-    ensureStateSchema();await save();render();
+    unlockPhase='保存内容の整合性確認';
+    ensureStateSchema();
+    unlockPhase='再保存';
+    await save();
+    unlockPhase='画面表示';
+    render();
   }catch(e){
     key=null;state=null;
-    renderLock('患者情報を読み込めませんでした。空き容量やデータの状態を確認してください。');
+    const safeErrorKinds=['QuotaExceededError','AbortError','UnknownError',
+      'InvalidStateError','NotReadableError','DataError','OperationError',
+      'SyntaxError','TypeError','RangeError','SecurityError','NotFoundError'];
+    const kind=safeErrorKinds.includes(String(e?.name||''))?String(e.name):'Other';
+    renderLock('患者情報を読み込めませんでした。診断：'+unlockPhase+'／'+kind+'。データの初期化・復元・消去は行わないでください。');
   }
 }
 async function lock(automatic=false){
