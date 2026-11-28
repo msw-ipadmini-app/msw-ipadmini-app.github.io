@@ -4,7 +4,7 @@
  */
 'use strict';
 const CACHE_PREFIX='msw-mvp01-clinical-rc-';
-const CACHE=CACHE_PREFIX+'20261128-ux27-native-voice-onetap-v1';
+const CACHE=CACHE_PREFIX+'20261128-ux28-bed-arrows-v2';
 const ASSETS=[
   './', './index.html',
   './pwa-updater.js?v=mvp01-sec13-20261027-journal-print-jp01',
@@ -28,7 +28,7 @@ const ASSETS=[
   './kana05-new-patient-ime.js?v=kana05-new-ime-dev-20261102',
   './ptb01-patient-text-backup.js?v=ptb01-dev1-20261102',
   './ptb02-backup-inspector.js?v=ptb02-verify-v1-20261102',
-  './ux01-scroll-return.js?v=ux01-scroll-20261104-v1',
+  './ux01-scroll-return.js?v=ux01-scroll-ux28-20261128-v1',
   './ux02-journal-discharge.js?v=ux02-journal-discharge-20261104-v1',
   './ux03-journal-patient-view.js?v=ux03-journal-patient-view-20261104-v1',
   './ux07-morning-print-fourup.js?v=ux07-fourup-20261105-v1',
@@ -57,6 +57,8 @@ const ASSETS=[
   './ux27-integration.css?v=ux27-failopen-20261127-v2',
   './ux27-host.js?v=ux27-failopen-20261127-v2',
   './ux27-integration.js?v=ux27-native-voice-one-tap-20261128-v1',
+  './ux28-bed-arrows.css?v=ux28-arrows-20261128-v2',
+  './ux28-bed-arrows.js?v=ux28-arrows-20261128-v2',
   './manifest.webmanifest', './icon.svg', './icon-apple.svg',
   './icon-192.png', './icon-512.png'
 ];
