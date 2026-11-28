@@ -22,7 +22,8 @@ function notesFor(patient){
 let chosenDay=localDay(new Date()),dailyScroll=0,returnToDaily=false,recognizer=null,speechPatient=null;
 let micPrefix='',micFinal='',micDraft='',micError='';
 let noteSaving=false;
-const SR=null; // Clinical safety: network speech recognition is disabled until approved.
+// Use Safari/iPad native Web Speech recognition; no custom recognizer or app upload.
+const SR=window.SpeechRecognition||window.webkitSpeechRecognition||null;
 
 function panelMarkup(patient){
  const notes=notesFor(patient),latest=notes[0],older=notes.slice(1);
@@ -35,7 +36,7 @@ function panelMarkup(patient){
    '<div class="ux27-controls"><button id="ux27Start" type="button" class="btn secondary" '+(!SR?'disabled':'')+' aria-pressed="false">🎤 音声入力</button>'+
    '<button type="button" id="ux27Stop" class="btn secondary" disabled>■ 停止</button>'+
    '<button type="button" id="ux27Save" class="btn">記録を追加</button></div>'+
-   '<p id="ux27Status" class="ux27-status" role="status" aria-live="polite">'+(SR?'音声入力後は内容を確認して保存してください。':'本番では音声認識を無効にしています。文字入力した内容を暗号化保存します。')+'</p>'+
+   '<p id="ux27Status" class="ux27-status" role="status" aria-live="polite">'+(SR?'🎤を押すと音声入力開始。音声はSafari側で外部処理される可能性があります。個人情報・患者情報は話さず、内容を確認して保存してください。':'この端末では音声認識を利用できません。文字入力は引き続き使えます。')+'</p>'+
    '<details id="ux27History"><summary>過去の回診メモを見る（'+older.length+'件）</summary>'+
    '<div class="ux27-history-list">'+(history||'<p>過去のメモはありません。</p>')+'</div></details></section>';
 }
@@ -53,8 +54,10 @@ function abortMic(clearPartial=true){
  if($('ux27Save'))$('ux27Save').disabled=false;
 }
 function onMicStart(patient){
- if(!SR||recognizer||noteSaving)return;
+ if(!SR||recognizer||noteSaving||!host.unlocked()||host.getPatient()!==patient)return;
+ if(!window.isSecureContext){message('安全なHTTPS接続が必要です。','error');return;}
  let r;try{r=new SR()}catch(e){message('音声認識を開始できません。','error');return;}
+ if('processLocally' in r)r.processLocally=true; // Prefer on-device recognition if supported.
  r.lang='ja-JP';r.continuous=false;r.interimResults=true;r.maxAlternatives=1;
  const box=$('ux27Text');
  micPrefix=box.value.trim();micFinal='';micDraft='';micError='';
@@ -66,6 +69,7 @@ function onMicStart(patient){
  r.onstart=()=>{if(recognizer!==r)return;message('音声を認識中。終了するときは「停止」を押してください。','active')};
  r.onresult=e=>{
   if(recognizer!==r)return;
+  if(!host.unlocked()||host.getPatient()!==patient){abortMic();return;}
   let final='',interim='';
   for(let i=0;i<e.results.length;i++){const row=e.results[i],s=String(row[0]?.transcript||'').trim();if(row.isFinal)final+=s;else interim+=s;}
   micFinal=final;micDraft=interim;
