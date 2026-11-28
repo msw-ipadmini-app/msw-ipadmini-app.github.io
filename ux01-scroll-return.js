@@ -38,7 +38,7 @@
     window.requestAnimationFrame(apply);
   }
   window.openPatient=function(...args){
-    returnPosition=listVisible()?capture():null;
+    if(listVisible())returnPosition=capture();
     return openOriginal.apply(this,args);
   };
   window.closePatient=function(...args){
